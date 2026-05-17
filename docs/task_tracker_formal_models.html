@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg-1, #f8f9fa); color: var(--text-1, #1a1a2e); }
+  
+  .tabs { display: flex; border-bottom: 2px solid var(--border, #e0e0e0); background: var(--bg-2, #fff); padding: 0 16px; }
+  .tab { padding: 10px 18px; cursor: pointer; font-size: 13px; font-weight: 500; color: var(--text-2, #666); border-bottom: 3px solid transparent; margin-bottom: -2px; transition: all 0.15s; user-select: none; }
+  .tab.active { color: var(--accent, #5b6af0); border-bottom-color: var(--accent, #5b6af0); }
+  .tab:hover:not(.active) { color: var(--text-1, #333); }
+  
+  .panel { display: none; padding: 24px 20px; }
+  .panel.active { display: block; }
+  
+  svg { width: 100%; overflow: visible; }
+  
+  /* Node styles */
+  .state-circle { stroke-width: 2; }
+  .state-label { font-size: 12px; font-weight: 600; text-anchor: middle; dominant-baseline: middle; }
+  .state-sublabel { font-size: 10px; text-anchor: middle; dominant-baseline: middle; fill: #888; }
+  
+  /* Arrow */
+  .arrow { stroke-width: 1.8; fill: none; marker-end: url(#arrowhead); }
+  .arrow-label { font-size: 10px; fill: #555; text-anchor: middle; }
+  
+  /* Legend */
+  .legend { display: flex; gap: 16px; flex-wrap: wrap; margin-top: 12px; padding: 10px 14px; background: var(--bg-2, #fff); border-radius: 8px; border: 1px solid var(--border, #e8e8e8); }
+  .legend-item { display: flex; align-items: center; gap: 6px; font-size: 11px; color: #555; }
+  .legend-dot { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; }
+  
+  .panel-title { font-size: 14px; font-weight: 700; color: #1a1a2e; margin-bottom: 4px; }
+  .panel-sub { font-size: 12px; color: #777; margin-bottom: 16px; }
+</style>
+</head>
+<body>
+
+<div class="tabs">
+  <div class="tab active" onclick="show(0)">Task FSM</div>
+  <div class="tab" onclick="show(1)">Worker FSM</div>
+  <div class="tab" onclick="show(2)">System LTS</div>
+  <div class="tab" onclick="show(3)">MDP / RL</div>
+  <div class="tab" onclick="show(4)">Architecture</div>
+</div>
+
+<!-- TAB 0: Task FSM -->
+<div class="panel active" id="p0">
+  <div class="panel-title">Task Lifecycle — Finite State Machine</div>
+  <div class="panel-sub">States a task moves through. Safety property: no task reaches DONE without passing through IN_REVIEW.</div>
+  <svg viewBox="0 0 720 320" height="300">
+    <defs>
+      <marker id="ah0" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto">
+        <path d="M0,0 L0,6 L8,3 z" fill="#666"/>
+      </marker>
+      <marker id="ah0r" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto">
+        <path d="M0,0 L0,6 L8,3 z" fill="#e05c5c"/>
+      </marker>
+      <marker id="ah0b" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto">
+        <path d="M0,0 L0,6 L8,3 z" fill="#5b6af0"/>
+      </marker>
+    </defs>
+
+    <!-- BACKLOG -->
+    <circle cx="80" cy="160" r="42" fill="#f0f1fe" stroke="#5b6af0" stroke-width="2" class="state-circle"/>
+    <text x="80" y="155" class="state-label" fill="#3d4db7">BACKLOG</text>
+    <text x="80" y="170" class="state-sublabel">initial</text>
+
+    <!-- ASSIGNED -->
+    <circle cx="230" cy="160" r="42" fill="#fff7ed" stroke="#f59e0b" stroke-width="2" class="state-circle"/>
+    <text x="230" y="160" class="state-label" fill="#b45309">ASSIGNED</text>
+
+    <!-- IN_PROGRESS -->
+    <circle cx="400" cy="160" r="46" fill="#ecfdf5" stroke="#10b981" stroke-width="2" class="state-circle"/>
+    <text x="400" y="154" class="state-label" fill="#065f46">IN_</text>
+    <text x="400" y="168" class="state-label" fill="#065f46">PROGRESS</text>
+
+    <!-- BLOCKED -->
+    <circle cx="400" cy="290" r="38" fill="#fff1f2" stroke="#e05c5c" stroke-width="2" class="state-circle"/>
+    <text x="400" y="290" class="state-label" fill="#9f1239">BLOCKED</text>
+
+    <!-- IN_REVIEW -->
+    <circle cx="565" cy="160" r="42" fill="#f5f3ff" stroke="#8b5cf6" stroke-width="2" class="state-circle"/>
+    <text x="565" y="154" class="state-label" fill="#5b21b6">IN_</text>
+    <text x="565" y="168" class="state-label" fill="#5b21b6">REVIEW</text>
+
+    <!-- DONE -->
+    <circle cx="680" cy="160" r="38" fill="#f0fdf4" stroke="#22c55e" stroke-width="2.5" class="state-circle"/>
+    <circle cx="680" cy="160" r="32" fill="none" stroke="#22c55e" stroke-width="1.5"/>
+    <text x="680" y="160" class="state-label" fill="#15803d">DONE</text>
+
+    <!-- Arrows: BACKLOG → ASSIGNED -->
+    <path d="M122,160 L188,160" stroke="#666" stroke-width="1.8" fill="none" marker-end="url(#ah0)"/>
+    <text x="155" y="150" class="arrow-label">assign</text>
+
+    <!-- ASSIGNED → IN_PROGRESS -->
+    <path d="M272,160 L354,160" stroke="#666" stroke-width="1.8" fill="none" marker-end="url(#ah0)"/>
+    <text x="313" y="150" class="arrow-label">start</text>
+
+    <!-- IN_PROGRESS → IN_REVIEW -->
+    <path d="M446,160 L523,160" stroke="#5b6af0" stroke-width="1.8" fill="none" marker-end="url(#ah0b)"/>
+    <text x="485" y="150" class="arrow-label" fill="#5b6af0">submit</text>
+
+    <!-- IN_REVIEW → DONE -->
+    <path d="M607,160 L642,160" stroke="#22c55e" stroke-width="1.8" fill="none" marker-end="url(#ah0)"/>
+    <text x="625" y="150" class="arrow-label">approve</text>
+
+    <!-- IN_REVIEW → IN_PROGRESS (reject) -->
+    <path d="M545,118 Q480,60 420,114" stroke="#e05c5c" stroke-width="1.5" fill="none" marker-end="url(#ah0r)"/>
+    <text x="482" y="72" class="arrow-label" fill="#e05c5c">reject</text>
+
+    <!-- IN_PROGRESS → BLOCKED -->
+    <path d="M400,206 L400,252" stroke="#e05c5c" stroke-width="1.8" fill="none" marker-end="url(#ah0r)"/>
+    <text x="415" y="232" class="arrow-label" fill="#e05c5c">block</text>
+
+    <!-- BLOCKED → IN_PROGRESS -->
+    <path d="M372,255 L372,207" stroke="#10b981" stroke-width="1.5" fill="none" marker-end="url(#ah0)"/>
+    <text x="345" y="235" class="arrow-label" fill="#10b981">unblock</text>
+
+    <!-- ASSIGNED → BACKLOG (reassign/cancel) -->
+    <path d="M210,118 Q150,70 102,118" stroke="#aaa" stroke-width="1.2" fill="none" stroke-dasharray="4,3" marker-end="url(#ah0)"/>
+    <text x="156" y="84" class="arrow-label">cancel</text>
+  </svg>
+  <div class="legend">
+    <div class="legend-item"><div class="legend-dot" style="background:#5b6af0"></div>Initial state</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#22c55e"></div>Final state (double ring)</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#e05c5c"></div>Error / blocking transitions</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#5b6af0; opacity:0.5"></div>Submit path (enforced review)</div>
+  </div>
+</div>
+
+<!-- TAB 1: Worker FSM -->
+<div class="panel" id="p1">
+  <div class="panel-title">Worker State Machine</div>
+  <div class="panel-sub">Worker transitions driven by task load and admin overrides. OVERLOADED triggers rebalancing.</div>
+  <svg viewBox="0 0 680 300" height="280">
+    <defs>
+      <marker id="ah1" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto">
+        <path d="M0,0 L0,6 L8,3 z" fill="#666"/>
+      </marker>
+      <marker id="ah1r" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto">
+        <path d="M0,0 L0,6 L8,3 z" fill="#e05c5c"/>
+      </marker>
+      <marker id="ah1g" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto">
+        <path d="M0,0 L0,6 L8,3 z" fill="#10b981"/>
+      </marker>
+    </defs>
+
+    <!-- IDLE -->
+    <circle cx="120" cy="150" r="48" fill="#f0f1fe" stroke="#5b6af0" stroke-width="2.5"/>
+    <circle cx="120" cy="150" r="41" fill="none" stroke="#5b6af0" stroke-width="1.2"/>
+    <text x="120" y="145" class="state-label" fill="#3d4db7">IDLE</text>
+    <text x="120" y="160" class="state-sublabel">initial</text>
+
+    <!-- BUSY -->
+    <circle cx="300" cy="150" r="48" fill="#ecfdf5" stroke="#10b981" stroke-width="2"/>
+    <text x="300" y="150" class="state-label" fill="#065f46">BUSY</text>
+
+    <!-- OVERLOADED -->
+    <circle cx="480" cy="150" r="50" fill="#fff7ed" stroke="#f59e0b" stroke-width="2"/>
+    <text x="480" y="144" class="state-label" fill="#b45309">OVER-</text>
+    <text x="480" y="158" class="state-label" fill="#b45309">LOADED</text>
+
+    <!-- UNAVAILABLE -->
+    <circle cx="300" cy="270" r="42" fill="#fff1f2" stroke="#e05c5c" stroke-width="2"/>
+    <text x="300" y="264" class="state-label" fill="#9f1239">UNAVAIL-</text>
+    <text x="300" y="278" class="state-sublabel">admin-set</text>
+
+    <!-- IDLE → BUSY -->
+    <path d="M168,140 L252,140" stroke="#666" stroke-width="1.8" fill="none" marker-end="url(#ah1)"/>
+    <text x="210" y="130" class="arrow-label">task_assigned</text>
+
+    <!-- BUSY → IDLE -->
+    <path d="M252,162 L168,162" stroke="#10b981" stroke-width="1.5" fill="none" marker-end="url(#ah1g)"/>
+    <text x="210" y="178" class="arrow-label" fill="#10b981">all_done</text>
+
+    <!-- BUSY → OVERLOADED -->
+    <path d="M348,140 L430,140" stroke="#f59e0b" stroke-width="1.8" fill="none" marker-end="url(#ah1)"/>
+    <text x="389" y="130" class="arrow-label">load &gt; threshold</text>
+
+    <!-- OVERLOADED → BUSY -->
+    <path d="M430,162 L348,162" stroke="#10b981" stroke-width="1.5" fill="none" marker-end="url(#ah1g)"/>
+    <text x="389" y="178" class="arrow-label" fill="#10b981">task_completed</text>
+
+    <!-- BUSY → UNAVAILABLE -->
+    <path d="M280,198 L280,228" stroke="#e05c5c" stroke-width="1.5" fill="none" marker-end="url(#ah1r)"/>
+    <text x="215" y="218" class="arrow-label" fill="#e05c5c">set_unavailable</text>
+
+    <!-- UNAVAILABLE → IDLE -->
+    <path d="M262,237 Q180,230 138,198" stroke="#5b6af0" stroke-width="1.5" fill="none" marker-end="url(#ah1)"/>
+    <text x="185" y="246" class="arrow-label" fill="#5b6af0">set_available</text>
+
+    <!-- OVERLOADED self-loop note -->
+    <path d="M510,105 Q560,70 530,112" stroke="#f59e0b" stroke-width="1.2" fill="none" stroke-dasharray="3,2" marker-end="url(#ah1)"/>
+    <text x="555" y="86" class="arrow-label" fill="#f59e0b">RL: skip</text>
+    <text x="555" y="98" class="arrow-label" fill="#f59e0b">assignment</text>
+  </svg>
+  <div class="legend">
+    <div class="legend-item"><div class="legend-dot" style="background:#5b6af0"></div>Initial (double ring)</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#f59e0b"></div>Overloaded — RL agent avoids assigning here</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#e05c5c"></div>Unavailable — admin-controlled</div>
+  </div>
+</div>
+
+<!-- TAB 2: System LTS -->
+<div class="panel" id="p2">
+  <div class="panel-title">Simplified System LTS — 2 Workers × 2 Tasks</div>
+  <div class="panel-sub">States are tuples (W1, W2, T1, T2). Only key transitions shown. State space grows exponentially — motivating RL search.</div>
+  <svg viewBox="0 0 740 360" height="340">
+    <defs>
+      <marker id="ah2" markerWidth="7" markerHeight="7" refX="6" refY="3" orient="auto">
+        <path d="M0,0 L0,6 L7,3 z" fill="#666"/>
+      </marker>
+      <marker id="ah2b" markerWidth="7" markerHeight="7" refX="6" refY="3" orient="auto">
+        <path d="M0,0 L0,6 L7,3 z" fill="#5b6af0"/>
+      </marker>
+      <marker id="ah2g" markerWidth="7" markerHeight="7" refX="6" refY="3" orient="auto">
+        <path d="M0,0 L0,6 L7,3 z" fill="#22c55e"/>
+      </marker>
+    </defs>
+
+    <!-- State nodes as rounded rects -->
+    <!-- S0: initial -->
+    <rect x="10" y="155" width="120" height="44" rx="8" fill="#f0f1fe" stroke="#5b6af0" stroke-width="2"/>
+    <text x="70" y="172" class="state-label" fill="#3d4db7" font-size="10">I, I, BL, BL</text>
+    <text x="70" y="185" class="state-sublabel">S₀ initial</text>
+
+    <!-- S1: assign T1→W1 -->
+    <rect x="200" y="80" width="130" height="44" rx="8" fill="#fff7ed" stroke="#f59e0b" stroke-width="1.8"/>
+    <text x="265" y="97" class="state-label" fill="#92400e" font-size="10">B, I, ASGN, BL</text>
+    <text x="265" y="110" class="state-sublabel">S₁</text>
+
+    <!-- S2: assign T2→W2 -->
+    <rect x="200" y="235" width="130" height="44" rx="8" fill="#fff7ed" stroke="#f59e0b" stroke-width="1.8"/>
+    <text x="265" y="252" class="state-label" fill="#92400e" font-size="10">I, B, BL, ASGN</text>
+    <text x="265" y="265" class="state-sublabel">S₂</text>
+
+    <!-- S3: both assigned -->
+    <rect x="390" y="155" width="140" height="44" rx="8" fill="#ecfdf5" stroke="#10b981" stroke-width="1.8"/>
+    <text x="460" y="172" class="state-label" fill="#065f46" font-size="10">B, B, ASGN, ASGN</text>
+    <text x="460" y="185" class="state-sublabel">S₃</text>
+
+    <!-- S4: T1 in progress -->
+    <rect x="200" y="155" width="130" height="44" rx="8" fill="#ecfdf5" stroke="#10b981" stroke-width="1.5"/>
+    <text x="265" y="172" class="state-label" fill="#065f46" font-size="10">B, I, IP, BL</text>
+    <text x="265" y="185" class="state-sublabel">S₄</text>
+
+    <!-- S5: T1 done, T2 done -->
+    <rect x="580" y="155" width="140" height="44" rx="8" fill="#f0fdf4" stroke="#22c55e" stroke-width="2.5"/>
+    <rect x="585" y="160" width="130" height="34" rx="5" fill="none" stroke="#22c55e" stroke-width="1.2"/>
+    <text x="650" y="172" class="state-label" fill="#15803d" font-size="10">I, I, DONE, DONE</text>
+    <text x="650" y="185" class="state-sublabel">S₅ goal</text>
+
+    <!-- Transitions -->
+    <!-- S0 → S1 -->
+    <path d="M130,166 Q165,130 200,110" stroke="#666" stroke-width="1.5" fill="none" marker-end="url(#ah2)"/>
+    <text x="148" y="130" class="arrow-label">assign(T1,W1)</text>
+
+    <!-- S0 → S2 -->
+    <path d="M130,172 Q165,210 200,248" stroke="#666" stroke-width="1.5" fill="none" marker-end="url(#ah2)"/>
+    <text x="132" y="218" class="arrow-label">assign(T2,W2)</text>
+
+    <!-- S0 → S4 (assign T1 to W1 directly) -->
+    <path d="M130,170 L200,170" stroke="#5b6af0" stroke-width="1.5" fill="none" marker-end="url(#ah2b)" stroke-dasharray="5,3"/>
+    <text x="165" y="163" class="arrow-label" fill="#5b6af0">assign(T1,W1)</text>
+
+    <!-- S1 → S3 -->
+    <path d="M330,102 Q360,130 390,162" stroke="#666" stroke-width="1.5" fill="none" marker-end="url(#ah2)"/>
+    <text x="352" y="128" class="arrow-label">assign(T2,W2)</text>
+
+    <!-- S2 → S3 -->
+    <path d="M330,252 Q360,220 392,188" stroke="#666" stroke-width="1.5" fill="none" marker-end="url(#ah2)"/>
+    <text x="336" y="232" class="arrow-label">assign(T1,W1)</text>
+
+    <!-- S3 → S5 -->
+    <path d="M530,177 L580,177" stroke="#22c55e" stroke-width="1.8" fill="none" marker-end="url(#ah2g)"/>
+    <text x="555" y="168" class="arrow-label" fill="#22c55e">all complete</text>
+
+    <!-- S4 → S3 area -->
+    <path d="M330,170 L390,172" stroke="#5b6af0" stroke-width="1.5" fill="none" marker-end="url(#ah2b)" stroke-dasharray="4,3"/>
+    <text x="360" y="163" class="arrow-label" fill="#5b6af0">assign(T2,W2)</text>
+
+    <!-- State explosion note -->
+    <rect x="10" y="10" width="300" height="50" rx="6" fill="#fefce8" stroke="#fbbf24" stroke-width="1.2"/>
+    <text x="20" y="28" font-size="10" fill="#92400e" font-weight="600">State explosion: 2 workers × 2 tasks</text>
+    <text x="20" y="42" font-size="10" fill="#b45309">= manageable. Real system: 10 workers × 50 tasks</text>
+    <text x="20" y="54" font-size="10" fill="#b45309">= 10⁸+ states → motivates RL-guided search</text>
+  </svg>
+  <div class="legend">
+    <div class="legend-item"><span style="font-size:10px;background:#f0f1fe;padding:2px 6px;border-radius:4px;border:1px solid #5b6af0">I=IDLE, B=BUSY</span></div>
+    <div class="legend-item"><span style="font-size:10px;background:#fff7ed;padding:2px 6px;border-radius:4px;border:1px solid #f59e0b">BL=BACKLOG, ASGN=ASSIGNED</span></div>
+    <div class="legend-item"><span style="font-size:10px;background:#ecfdf5;padding:2px 6px;border-radius:4px;border:1px solid #10b981">IP=IN_PROGRESS</span></div>
+  </div>
+</div>
+
+<!-- TAB 3: MDP / RL -->
+<div class="panel" id="p3">
+  <div class="panel-title">MDP — RL Assignment Agent</div>
+  <div class="panel-sub">The assignment problem as a formal MDP (S, A, P, R, γ). Admin controls τ (temperature) for exploit↔explore tradeoff.</div>
+  <svg viewBox="0 0 720 340" height="320">
+    <defs>
+      <marker id="ah3" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto">
+        <path d="M0,0 L0,6 L8,3 z" fill="#666"/>
+      </marker>
+      <marker id="ah3p" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto">
+        <path d="M0,0 L0,6 L8,3 z" fill="#8b5cf6"/>
+      </marker>
+      <marker id="ah3g" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto">
+        <path d="M0,0 L0,6 L8,3 z" fill="#22c55e"/>
+      </marker>
+    </defs>
+
+    <!-- Environment box -->
+    <rect x="10" y="40" width="700" height="270" rx="12" fill="#fafafa" stroke="#d0d0d0" stroke-width="1.5" stroke-dasharray="6,4"/>
+    <text x="24" y="58" font-size="11" fill="#aaa" font-weight="600">ENVIRONMENT (Task Tracker System)</text>
+
+    <!-- State box -->
+    <rect x="40" y="80" width="180" height="200" rx="10" fill="#f0f1fe" stroke="#5b6af0" stroke-width="2"/>
+    <text x="130" y="100" class="state-label" fill="#3d4db7">STATE  s</text>
+    <text x="130" y="118" font-size="9.5" fill="#555" text-anchor="middle">task_complexity</text>
+    <text x="130" y="132" font-size="9.5" fill="#555" text-anchor="middle">task_priority</text>
+    <text x="130" y="146" font-size="9.5" fill="#555" text-anchor="middle">task_category (1-hot)</text>
+    <text x="130" y="160" font-size="9.5" fill="#555" text-anchor="middle">worker_skill[cat]</text>
+    <text x="130" y="174" font-size="9.5" fill="#555" text-anchor="middle">worker_load</text>
+    <text x="130" y="188" font-size="9.5" fill="#555" text-anchor="middle">worker_efficiency</text>
+    <text x="130" y="202" font-size="9.5" fill="#555" text-anchor="middle">worker_availability</text>
+    <text x="130" y="260" font-size="9" fill="#888" text-anchor="middle" font-style="italic">per (task, worker) pair</text>
+
+    <!-- Agent box -->
+    <rect x="280" y="80" width="160" height="190" rx="10" fill="#f5f3ff" stroke="#8b5cf6" stroke-width="2"/>
+    <text x="360" y="103" class="state-label" fill="#5b21b6">AGENT</text>
+    <text x="360" y="122" font-size="10" fill="#6d28d9" text-anchor="middle" font-weight="600">Q-network</text>
+    <text x="360" y="140" font-size="9.5" fill="#555" text-anchor="middle">input: state vector s</text>
+    <text x="360" y="155" font-size="9.5" fill="#555" text-anchor="middle">output: Q(s, assign_i)</text>
+    <text x="360" y="178" font-size="9.5" fill="#666" text-anchor="middle" font-weight="600">Boltzmann sampling:</text>
+    <text x="360" y="193" font-size="9" fill="#666" text-anchor="middle">P(a) ∝ exp(Q(a) / τ)</text>
+    <rect x="300" y="205" width="120" height="26" rx="5" fill="#ede9fe" stroke="#8b5cf6" stroke-width="1"/>
+    <text x="360" y="213" font-size="9" fill="#5b21b6" text-anchor="middle" font-weight="600">τ = admin temperature</text>
+    <text x="360" y="225" font-size="8.5" fill="#7c3aed" text-anchor="middle">low τ = exploit | high τ = explore</text>
+
+    <!-- Reward box -->
+    <rect x="510" y="80" width="180" height="170" rx="10" fill="#ecfdf5" stroke="#10b981" stroke-width="2"/>
+    <text x="600" y="100" class="state-label" fill="#065f46">REWARD  R</text>
+    <text x="600" y="120" font-size="9.5" fill="#555" text-anchor="middle">+ w₁ × priority_score</text>
+    <text x="600" y="136" font-size="9.5" fill="#555" text-anchor="middle">+ w₂ × efficiency(w,t)</text>
+    <text x="600" y="152" font-size="9.5" fill="#555" text-anchor="middle">− w₃ × overload_penalty</text>
+    <text x="600" y="168" font-size="9.5" fill="#555" text-anchor="middle">+ w₄ × throughput_bonus</text>
+    <line x1="520" y1="180" x2="680" y2="180" stroke="#d0f0e0" stroke-width="1"/>
+    <text x="600" y="196" font-size="9" fill="#065f46" text-anchor="middle" font-weight="600">Bellman update:</text>
+    <text x="600" y="210" font-size="8.5" fill="#0f766e" text-anchor="middle">Q(s,a) ← R + γ·max Q(s',a')</text>
+    <text x="600" y="224" font-size="8.5" fill="#888" text-anchor="middle">γ = discount (long-term thinking)</text>
+
+    <!-- Arrows -->
+    <!-- State → Agent -->
+    <path d="M220,160 L280,160" stroke="#5b6af0" stroke-width="1.8" fill="none" marker-end="url(#ah3p)"/>
+    <text x="250" y="152" class="arrow-label" fill="#5b6af0">s</text>
+
+    <!-- Agent → action -->
+    <path d="M440,155 L510,155" stroke="#8b5cf6" stroke-width="1.8" fill="none" marker-end="url(#ah3p)"/>
+    <text x="475" y="147" class="arrow-label" fill="#8b5cf6">a = assign(t,w)</text>
+
+    <!-- Reward back to agent -->
+    <path d="M600,250 Q600,290 360,280 Q280,278 360,270" stroke="#10b981" stroke-width="1.5" fill="none" marker-end="url(#ah3g)"/>
+    <text x="480" y="296" class="arrow-label" fill="#10b981">reward R, next state s'</text>
+
+    <!-- Sprint mode annotation -->
+    <rect x="290" y="240" width="140" height="22" rx="5" fill="#fef9c3" stroke="#fbbf24" stroke-width="1"/>
+    <text x="360" y="255" font-size="9" fill="#92400e" text-anchor="middle">🚀 Sprint: τ→0 (pure exploit)</text>
+  </svg>
+</div>
+
+<!-- TAB 4: Architecture -->
+<div class="panel" id="p4">
+  <div class="panel-title">System Architecture</div>
+  <div class="panel-sub">Full stack — from frontend Kanban to RL engine and database.</div>
+  <svg viewBox="0 0 720 340" height="320">
+    <defs>
+      <marker id="ah4" markerWidth="7" markerHeight="7" refX="6" refY="3" orient="auto">
+        <path d="M0,0 L0,6 L7,3 z" fill="#666"/>
+      </marker>
+    </defs>
+
+    <!-- Frontend layer -->
+    <rect x="10" y="10" width="700" height="60" rx="8" fill="#f0f1fe" stroke="#5b6af0" stroke-width="1.8"/>
+    <text x="360" y="30" font-size="11" fill="#3d4db7" text-anchor="middle" font-weight="700">FRONTEND</text>
+    <rect x="30" y="38" width="140" height="22" rx="5" fill="#fff" stroke="#c7d2fe" stroke-width="1.2"/>
+    <text x="100" y="52" font-size="9.5" fill="#3730a3" text-anchor="middle">Kanban Board</text>
+    <rect x="190" y="38" width="140" height="22" rx="5" fill="#fff" stroke="#c7d2fe" stroke-width="1.2"/>
+    <text x="260" y="52" font-size="9.5" fill="#3730a3" text-anchor="middle">Admin Panel (τ slider, weights)</text>
+    <rect x="350" y="38" width="150" height="22" rx="5" fill="#fff" stroke="#c7d2fe" stroke-width="1.2"/>
+    <text x="425" y="52" font-size="9.5" fill="#3730a3" text-anchor="middle">Analytics Dashboard</text>
+    <rect x="520" y="38" width="170" height="22" rx="5" fill="#fff" stroke="#c7d2fe" stroke-width="1.2"/>
+    <text x="605" y="52" font-size="9.5" fill="#3730a3" text-anchor="middle">Worker Skill Profiles</text>
+
+    <!-- REST API arrow -->
+    <path d="M360,70 L360,95" stroke="#888" stroke-width="1.5" fill="none" marker-end="url(#ah4)"/>
+    <text x="375" y="85" font-size="9" fill="#888">REST API</text>
+
+    <!-- Backend layer -->
+    <rect x="10" y="95" width="700" height="130" rx="8" fill="#ecfdf5" stroke="#10b981" stroke-width="1.8"/>
+    <text x="360" y="113" font-size="11" fill="#065f46" text-anchor="middle" font-weight="700">BACKEND (FastAPI / Python)</text>
+
+    <rect x="25" y="120" width="145" height="90" rx="6" fill="#fff" stroke="#6ee7b7" stroke-width="1.2"/>
+    <text x="97" y="137" font-size="9.5" fill="#065f46" text-anchor="middle" font-weight="600">FSM Engine</text>
+    <text x="97" y="151" font-size="8.5" fill="#555" text-anchor="middle">Task state machine</text>
+    <text x="97" y="163" font-size="8.5" fill="#555" text-anchor="middle">Worker state machine</text>
+    <text x="97" y="175" font-size="8.5" fill="#555" text-anchor="middle">Transition validation</text>
+    <text x="97" y="187" font-size="8.5" fill="#555" text-anchor="middle">Safety property checks</text>
+    <text x="97" y="199" font-size="8.5" fill="#e05c5c" text-anchor="middle" font-weight="600">+ LTS reachability</text>
+
+    <rect x="185" y="120" width="145" height="90" rx="6" fill="#fff" stroke="#6ee7b7" stroke-width="1.2"/>
+    <text x="257" y="137" font-size="9.5" fill="#065f46" text-anchor="middle" font-weight="600">RL Agent</text>
+    <text x="257" y="151" font-size="8.5" fill="#555" text-anchor="middle">State vector builder</text>
+    <text x="257" y="163" font-size="8.5" fill="#555" text-anchor="middle">Q-network (PyTorch)</text>
+    <text x="257" y="175" font-size="8.5" fill="#555" text-anchor="middle">Boltzmann sampling</text>
+    <text x="257" y="187" font-size="8.5" fill="#555" text-anchor="middle">Experience replay buffer</text>
+    <text x="257" y="199" font-size="8.5" fill="#7c3aed" text-anchor="middle" font-weight="600">τ from admin config</text>
+
+    <rect x="345" y="120" width="145" height="90" rx="6" fill="#fff" stroke="#6ee7b7" stroke-width="1.2"/>
+    <text x="417" y="137" font-size="9.5" fill="#065f46" text-anchor="middle" font-weight="600">Assignment Engine</text>
+    <text x="417" y="151" font-size="8.5" fill="#555" text-anchor="middle">Enumerate (task, worker)</text>
+    <text x="417" y="163" font-size="8.5" fill="#555" text-anchor="middle">Build state vectors</text>
+    <text x="417" y="175" font-size="8.5" fill="#555" text-anchor="middle">Query RL for Q-values</text>
+    <text x="417" y="187" font-size="8.5" fill="#555" text-anchor="middle">Sample action via τ</text>
+    <text x="417" y="199" font-size="8.5" fill="#555" text-anchor="middle">Execute + update FSMs</text>
+
+    <rect x="505" y="120" width="190" height="90" rx="6" fill="#fff" stroke="#6ee7b7" stroke-width="1.2"/>
+    <text x="600" y="137" font-size="9.5" fill="#065f46" text-anchor="middle" font-weight="600">Performance Tracker</text>
+    <text x="600" y="151" font-size="8.5" fill="#555" text-anchor="middle">Actual vs. estimated time</text>
+    <text x="600" y="163" font-size="8.5" fill="#555" text-anchor="middle">Per-worker efficiency scores</text>
+    <text x="600" y="175" font-size="8.5" fill="#555" text-anchor="middle">Category-level proficiency</text>
+    <text x="600" y="187" font-size="8.5" fill="#555" text-anchor="middle">Feeds back into state s</text>
+    <text x="600" y="199" font-size="8.5" fill="#22c55e" text-anchor="middle" font-weight="600">Reward signal source</text>
+
+    <!-- DB arrow -->
+    <path d="M360,225 L360,250" stroke="#888" stroke-width="1.5" fill="none" marker-end="url(#ah4)"/>
+    <text x="375" y="242" font-size="9" fill="#888">ORM</text>
+
+    <!-- DB layer -->
+    <rect x="10" y="255" width="700" height="70" rx="8" fill="#fff7ed" stroke="#f59e0b" stroke-width="1.8"/>
+    <text x="360" y="272" font-size="11" fill="#92400e" text-anchor="middle" font-weight="700">DATABASE (PostgreSQL / SQLite)</text>
+    <rect x="30" y="280" width="100" height="35" rx="5" fill="#fff" stroke="#fcd34d" stroke-width="1"/>
+    <text x="80" y="301" font-size="9" fill="#92400e" text-anchor="middle">tasks</text>
+    <rect x="145" y="280" width="100" height="35" rx="5" fill="#fff" stroke="#fcd34d" stroke-width="1"/>
+    <text x="195" y="301" font-size="9" fill="#92400e" text-anchor="middle">workers + skills</text>
+    <rect x="260" y="280" width="100" height="35" rx="5" fill="#fff" stroke="#fcd34d" stroke-width="1"/>
+    <text x="310" y="301" font-size="9" fill="#92400e" text-anchor="middle">assignments</text>
+    <rect x="375" y="280" width="130" height="35" rx="5" fill="#fff" stroke="#fcd34d" stroke-width="1"/>
+    <text x="440" y="301" font-size="9" fill="#92400e" text-anchor="middle">performance_history</text>
+    <rect x="520" y="280" width="170" height="35" rx="5" fill="#fff" stroke="#fcd34d" stroke-width="1"/>
+    <text x="605" y="301" font-size="9" fill="#92400e" text-anchor="middle">rl_experience_replay</text>
+  </svg>
+</div>
+
+<script>
+  function show(i) {
+    document.querySelectorAll('.panel').forEach((p,j) => p.classList.toggle('active', i===j));
+    document.querySelectorAll('.tab').forEach((t,j) => t.classList.toggle('active', i===j));
+  }
+</script>
+</body>
+</html>

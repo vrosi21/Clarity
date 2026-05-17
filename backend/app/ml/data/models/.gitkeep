@@ -1,0 +1,10 @@
+# Drop trained model artefacts here:
+#
+#   regressor.joblib   — sklearn-style BaseEfficiencyPredictor (knn / dt / linear)
+#   q_network.npz      — LinearQNetwork weights (np.savez of w, b, state_dim)
+#
+# After dropping new files in, hit POST /api/v1/projects/{id}/admin/reload-models
+# (ADMIN+) to refresh the in-memory ModelRegistry without restarting uvicorn.
+#
+# When neither file is present, the assignment endpoint falls back to a
+# heuristic policy so the API stays usable from day one.

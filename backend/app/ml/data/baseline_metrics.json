@@ -1,0 +1,26 @@
+{
+  "Random": {
+    "mean_eff_ratio": 1.8271064360828595,
+    "prio_weighted_eff": 1.8230999504878667,
+    "load_variance": 0.05913393239137172,
+    "blocking_rate": 0.0886904761904762
+  },
+  "Round-robin": {
+    "mean_eff_ratio": 1.874748620585213,
+    "prio_weighted_eff": 1.8627440160374102,
+    "load_variance": 0.0675784016415033,
+    "blocking_rate": 0.09573170731707317
+  },
+  "Greedy": {
+    "mean_eff_ratio": 1.3087472924818908,
+    "prio_weighted_eff": 1.2872792582813077,
+    "load_variance": 0.0631417208290091,
+    "blocking_rate": 0.060218978102189784
+  },
+  "RL": {
+    "mean_eff_ratio": 1.8533980284424527,
+    "prio_weighted_eff": 1.8484784828937233,
+    "load_variance": 0.08005723781436871,
+    "blocking_rate": 0.08152866242038216
+  }
+}

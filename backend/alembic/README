@@ -1,0 +1,8 @@
+Alembic migrations.
+
+To generate the initial migration:
+    cd backend
+    alembic revision --autogenerate -m "initial schema"
+
+To apply migrations:
+    alembic upgrade head

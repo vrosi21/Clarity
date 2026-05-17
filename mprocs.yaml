@@ -1,0 +1,9 @@
+procs:
+  db:
+    cmd: ["docker", "compose", "up", "db"]
+
+  backend:
+    cmd: ["powershell", "-File", "scripts/dev-backend.ps1"]
+
+  frontend:
+    cmd: ["powershell", "-File", "scripts/dev-frontend.ps1"]
