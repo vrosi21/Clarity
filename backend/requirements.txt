@@ -14,6 +14,8 @@ pandas
 scikit-learn
 joblib
 sentence-transformers>=2.2.0
+langchain-core>=0.3
+langchain-groq>=0.2
 
 # test-only — kept here so `pip install -r requirements.txt` in CI/dev sets up everything
 pytest

@@ -16,3 +16,14 @@ class CategoryRepository:
 
     def get_by_name(self, name: str) -> Category | None:
         return self.db.execute(select(Category).where(Category.name == name)).scalar_one_or_none()
+
+    def create(self, name: str, description: str) -> Category:
+        category = Category(name=name.lower().strip(), description=description.strip())
+        self.db.add(category)
+        self.db.commit()
+        self.db.refresh(category)
+        return category
+
+    def delete(self, category: Category) -> None:
+        self.db.delete(category)
+        self.db.commit()

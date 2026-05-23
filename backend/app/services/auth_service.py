@@ -14,11 +14,18 @@ class AuthService:
         self.user_repo = user_repo
 
     def update_self(self, user: User, data: SelfUpdate, db: Session) -> User:
-        if not verify_password(data.current_password, user.hashed_password):
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Current password is incorrect",
-            )
+        # Password is required only when changing credentials (username/password).
+        wants_credential_change = (
+            data.username is not None and data.username != user.username
+        ) or data.new_password is not None
+        if wants_credential_change:
+            if not data.current_password or not verify_password(
+                data.current_password, user.hashed_password
+            ):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Current password is incorrect",
+                )
         if data.username is not None and data.username != user.username:
             existing = self.user_repo.get_by_username(data.username)
             if existing is not None:
@@ -28,9 +35,27 @@ class AuthService:
             user.username = data.username
         if data.new_password is not None:
             user.hashed_password = hash_password(data.new_password)
+        if data.bio is not None:
+            self._upsert_bio(user, data.bio, db)
         db.commit()
         db.refresh(user)
         return user
+
+    @staticmethod
+    def _upsert_bio(user: User, bio: str, db: Session) -> None:
+        wp = user.worker_profile
+        if wp is None:
+            return
+        if wp.bio == bio:
+            return
+        wp.bio = bio
+        db.flush()
+        try:
+            from app.services.worker_profile_service import _refresh_bio_embedding
+            if bio:
+                _refresh_bio_embedding(wp, db)
+        except Exception:
+            pass
 
     def login(self, req: LoginRequest, db: Session) -> TokenResponse:
         user = self.user_repo.get_by_email(req.email)
@@ -65,5 +90,6 @@ class AuthService:
             full_name=user.full_name,
             years_experience=user.years_experience,
             is_active=user.is_active,
+            bio=user.worker_profile.bio if user.worker_profile else None,
             org_role=org_role_info,
         )

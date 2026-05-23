@@ -8,6 +8,7 @@ from app.core.database import SessionLocal
 from app.services.bootstrap import (
     ensure_builtin_roles,
     ensure_canonical_categories,
+    ensure_default_tags,
     ensure_root_user,
 )
 
@@ -17,6 +18,7 @@ async def lifespan(app: FastAPI):
     db = SessionLocal()
     try:
         ensure_canonical_categories(db)
+        ensure_default_tags(db)
         roles = ensure_builtin_roles(db)
         ensure_root_user(db, roles)
         db.commit()

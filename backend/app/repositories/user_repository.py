@@ -24,6 +24,19 @@ class UserRepository:
         from sqlalchemy import func, select
         return self.db.execute(select(func.count()).select_from(User)).scalar_one()
 
+    def search(self, q: str, limit: int = 20) -> list[User]:
+        pattern = f"%{q}%"
+        return list(
+            self.db.execute(
+                select(User)
+                .where(User.is_active == True)  # noqa: E712
+                .where(
+                    (User.username.ilike(pattern)) | (User.email.ilike(pattern))
+                )
+                .limit(limit)
+            ).scalars()
+        )
+
     def create(
         self,
         email: str,

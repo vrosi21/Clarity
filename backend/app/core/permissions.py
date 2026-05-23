@@ -42,6 +42,11 @@ class Permission:
     COMMENTS_DELETE_OWN = "comments:delete_own"
     COMMENTS_DELETE_ANY = "comments:delete_any"
 
+    # ── Categories ─────────────────────────────────────────────────────────────
+    # Org-level. Governs creating and deleting global task categories.
+    # Admins and org PMs hold this; project-scoped roles do not.
+    CATEGORIES_MANAGE = "categories:manage"
+
     ALL: list[str] = [
         ORG_MANAGE_USERS, ORG_READ_USERS, ORG_MANAGE_ROLES, ORG_MANAGE_SETTINGS,
         PROJECTS_CREATE, PROJECTS_READ, PROJECTS_UPDATE, PROJECTS_DELETE,
@@ -50,4 +55,5 @@ class Permission:
         TICKETS_CREATE, TICKETS_READ, TICKETS_UPDATE, TICKETS_DELETE,
         TICKETS_MOVE, TICKETS_ASSIGN, TICKETS_BE_ASSIGNED,
         COMMENTS_CREATE, COMMENTS_READ, COMMENTS_DELETE_OWN, COMMENTS_DELETE_ANY,
+        CATEGORIES_MANAGE,
     ]

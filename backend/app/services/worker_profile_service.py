@@ -28,6 +28,7 @@ def _to_response(profile, username: str | None) -> WorkerProfileResponse:
         base_productivity=profile.base_productivity,
         burnout_threshold=profile.burnout_threshold,
         is_available=profile.is_available,
+        bio=profile.bio,
         skill_profiles=[
             SkillProfileResponse.model_validate(sp) for sp in profile.skill_profiles
         ],
@@ -94,6 +95,7 @@ class WorkerProfileService:
 
         profile = self.worker_repo.get_by_user_id(user_id)
         data = req.model_dump(exclude_unset=True)
+        bio_changed = "bio" in data and (profile is None or profile.bio != data["bio"])
         if profile is None:
             if "seniority" not in data:
                 raise HTTPException(
@@ -103,6 +105,10 @@ class WorkerProfileService:
             profile = self.worker_repo.create(user_id=user_id, **data)
         else:
             self.worker_repo.update(profile, **data)
+
+        if bio_changed and profile.bio:
+            _refresh_bio_embedding(profile, db)
+
         db.commit()
         profile = self.worker_repo.get_by_user_id(user_id)
         return _to_response(profile, user.username)
@@ -129,3 +135,51 @@ class WorkerProfileService:
         db.commit()
         db.refresh(skill)
         return SkillProfileResponse.model_validate(skill)
+
+
+def _refresh_bio_embedding(profile, db: Session) -> None:
+    """Re-encode bio text and write it into WorkerSkillProfile.nlp_embedding.
+
+    Targets the primary_category if set; otherwise every existing skill profile
+    is updated with the same embedding (categories share the same bio).
+    Never raises — encoder failure must not block the profile save.
+    """
+    try:
+        from app.ml.nlp.encoder import SemanticEncoder
+        from app.models.worker_skill_profile import WorkerSkillProfile
+
+        encoder = SemanticEncoder()
+        # Anchor the bio embedding with the worker's known skill categories so
+        # the dot product against task embeddings (which include "Area: X") lands
+        # in the same semantic space. E.g. "bio text\nSkilled in: backend, devops"
+        cat_names = [sp.category.name for sp in (profile.skill_profiles or []) if sp.category]
+        text_to_encode = profile.bio
+        if cat_names:
+            text_to_encode = f"{profile.bio}\nSkilled in: {', '.join(cat_names)}"
+        embedding = encoder.encode_one(text_to_encode).tolist()
+
+        targets: list[WorkerSkillProfile] = []
+        if profile.primary_category_id:
+            existing = db.execute(
+                select(WorkerSkillProfile).where(
+                    WorkerSkillProfile.worker_id == profile.id,
+                    WorkerSkillProfile.category_id == profile.primary_category_id,
+                )
+            ).scalar_one_or_none()
+            if existing is None:
+                existing = WorkerSkillProfile(
+                    worker_id=profile.id,
+                    category_id=profile.primary_category_id,
+                    proficiency=0.5,
+                )
+                db.add(existing)
+            targets.append(existing)
+        else:
+            targets.extend(profile.skill_profiles or [])
+
+        for sp in targets:
+            sp.nlp_embedding = embedding
+            sp.nlp_ticket_count = (sp.nlp_ticket_count or 0)
+        db.flush()
+    except Exception:
+        pass

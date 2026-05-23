@@ -25,6 +25,7 @@ from app.models.enums import RoleScope, StageType
 from app.models.rl_project_config import RLProjectConfig
 from app.models.role import Role
 from app.models.stage import Stage
+from app.models.tag import Tag
 from app.models.user import User
 from app.models.user_org_role import UserOrgRole
 
@@ -52,6 +53,7 @@ ORG_PM_PERMS = [
     P.TICKETS_CREATE, P.TICKETS_READ, P.TICKETS_UPDATE, P.TICKETS_DELETE,
     P.TICKETS_MOVE, P.TICKETS_ASSIGN,
     P.COMMENTS_CREATE, P.COMMENTS_READ, P.COMMENTS_DELETE_OWN, P.COMMENTS_DELETE_ANY,
+    P.CATEGORIES_MANAGE,
 ]
 ORG_MEMBER_PERMS = [P.PROJECTS_READ, P.TICKETS_READ, P.COMMENTS_READ]
 PROJECT_PM_PERMS = [
@@ -128,6 +130,28 @@ def ensure_default_rl_config(db: Session, project_id: int) -> RLProjectConfig:
     db.add(config)
     db.flush()
     return config
+
+
+SEED_TAGS: tuple[str, ...] = (
+    "bug", "feature", "enhancement", "clarification needed",
+    "blocked", "urgent", "tech-debt", "refactor",
+    "question", "duplicate", "wont-fix", "good first issue",
+)
+
+
+def ensure_default_tags(db: Session) -> list[Tag]:
+    """Seed the UX-tag vocabulary on first run. Idempotent."""
+    existing_names = {t.name for t in db.query(Tag).all()}
+    created: list[Tag] = []
+    for name in SEED_TAGS:
+        if name in existing_names:
+            continue
+        tag = Tag(name=name)
+        db.add(tag)
+        created.append(tag)
+    if created:
+        db.flush()
+    return created
 
 
 def ensure_canonical_categories(db: Session) -> list[Category]:

@@ -8,6 +8,7 @@ import {
   Shield,
   Sun,
   Sparkles,
+  Tag,
   UserCog,
   Users,
 } from 'lucide-react'
@@ -36,6 +37,7 @@ const ADMIN_NAV = [
   { to: '/admin', label: 'Dashboard', icon: LayoutDashboard, end: true },
   { to: '/admin/users', label: 'Users', icon: Users, end: false },
   { to: '/admin/roles', label: 'Roles', icon: Shield, end: false },
+  { to: '/admin/categories', label: 'Categories', icon: Tag, end: false },
 ]
 
 export function Sidebar() {

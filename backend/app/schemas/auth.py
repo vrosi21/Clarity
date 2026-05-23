@@ -34,10 +34,12 @@ class UserResponse(BaseModel):
     full_name: str | None = None
     years_experience: int = 0
     is_active: bool = True
+    bio: str | None = None
     org_role: OrgRoleInfo | None = None
 
 
 class SelfUpdate(BaseModel):
     username: str | None = None
-    current_password: str
+    current_password: str | None = None
     new_password: str | None = None
+    bio: str | None = None

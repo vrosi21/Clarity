@@ -1,5 +1,5 @@
 import client from '@/api/client'
-import type { Priority, Ticket } from '@/types'
+import type { Priority, SuggestResponse, Ticket } from '@/types'
 
 export interface TicketCreatePayload {
   title: string
@@ -23,6 +23,13 @@ export interface TicketUpdatePayload {
   assignee_id?: number | null
 }
 
+export interface TicketSuggestPayload {
+  title: string
+  description?: string
+  category_ids?: number[]
+  complexity?: number
+}
+
 export const ticketsApi = {
   list: (projectId: number, params?: { stage_id?: number }) =>
     client
@@ -39,5 +46,9 @@ export const ticketsApi = {
       .post<Ticket>(`/projects/${projectId}/tickets/${ticketId}/move`, { stage_id: stageId })
       .then((r) => r.data),
   remove: (projectId: number, ticketId: number) =>
-    client.delete(`/projects/${projectId}/tickets/${ticketId}`).then(() => null),
+    client.delete(`/projects/${projectId}/tickets/${ticketId}`).then((r) => r.data),
+  suggest: (projectId: number, payload: TicketSuggestPayload) =>
+    client
+      .post<SuggestResponse>(`/projects/${projectId}/tickets/suggest`, payload)
+      .then((r) => r.data),
 }

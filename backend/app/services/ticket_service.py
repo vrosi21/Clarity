@@ -210,9 +210,12 @@ class TicketService:
                     status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)
                 )
 
+        dest_stage = self.stage_repo.get_by_id(stage_id)
         self.ticket_repo.move_to_stage(ticket, stage_id)
         db.commit()
         ticket = self.ticket_repo.get_by_id(ticket.id)
+        if dest_stage and dest_stage.type == StageType.FINAL:
+            _update_worker_nlp_embedding(ticket, db)
         return _to_response(ticket)
 
     @staticmethod
@@ -253,3 +256,77 @@ class TicketService:
         db.commit()
         ticket = self.ticket_repo.get_by_id(ticket.id)
         return _to_response(ticket)
+
+
+def _update_worker_nlp_embedding(ticket: Ticket, db: Session) -> None:
+    """
+    Called after a ticket reaches a FINAL stage.
+    Recomputes worker's nlp_embedding for the ticket's category by averaging
+    embeddings of their recent completed tickets in that category.
+    Never raises — embedding failure must not block ticket movement.
+    """
+    if ticket.assignee_id is None or ticket.category_id is None:
+        return
+    try:
+        from app.ml.recommenders.embedding_category_recommender import (
+            EmbeddingCategoryRecommender,
+        )
+        enc = EmbeddingCategoryRecommender._encoder
+        if enc is None:
+            return
+
+        import numpy as np
+        from sqlalchemy import select as sa_select
+        from app.ml.nlp.task_text import task_to_text
+        from app.models.category import Category
+
+        # Resolve category name so task_to_text can anchor the embedding —
+        # must match the format used by the worker scorer at query time.
+        cat_row = db.execute(
+            sa_select(Category).where(Category.id == ticket.category_id)
+        ).scalar_one_or_none()
+        category_hint = cat_row.name if cat_row else None
+
+        recent = db.execute(
+            sa_select(Ticket.title, Ticket.description)
+            .where(
+                Ticket.assignee_id == ticket.assignee_id,
+                Ticket.category_id == ticket.category_id,
+                Ticket.id != ticket.id,
+            )
+            .order_by(Ticket.updated_at.desc())
+            .limit(19)
+        ).all()
+
+        texts = [task_to_text(ticket.title, ticket.description, category_hint=category_hint)]
+        for t_title, t_desc in recent:
+            texts.append(task_to_text(t_title, t_desc, category_hint=category_hint))
+
+        from app.models.worker_profile import WorkerProfile
+        from app.models.worker_skill_profile import WorkerSkillProfile
+
+        wp = db.execute(
+            sa_select(WorkerProfile).where(WorkerProfile.user_id == ticket.assignee_id)
+        ).scalar_one_or_none()
+        if wp is None:
+            return
+
+        sp = db.execute(
+            sa_select(WorkerSkillProfile).where(
+                WorkerSkillProfile.worker_id == wp.id,
+                WorkerSkillProfile.category_id == ticket.category_id,
+            )
+        ).scalar_one_or_none()
+        if sp is None:
+            return
+
+        embs = enc.encode(texts)
+        avg_emb = embs.mean(axis=0)
+        norm = np.linalg.norm(avg_emb)
+        avg_emb = avg_emb / max(norm, 1e-8)
+
+        sp.nlp_embedding = avg_emb.tolist()
+        sp.nlp_ticket_count = len(texts)
+        db.flush()
+    except Exception:
+        pass

@@ -35,6 +35,7 @@ class AdminService:
         org_role = self.role_repo.get_org_role_for_user(user.id)
         role_id = org_role.role_id if org_role else None
         role_name = org_role.role.name if (org_role and org_role.role) else None
+        bio = user.worker_profile.bio if user.worker_profile else None
         return UserDetailOut(
             id=user.id,
             email=user.email,
@@ -44,6 +45,7 @@ class AdminService:
             is_active=user.is_active,
             org_role_id=role_id,
             org_role_name=role_name,
+            bio=bio,
             skills=skills,
         )
 
@@ -112,6 +114,7 @@ class AdminService:
     ) -> UserDetailOut:
         updates = data.model_dump(exclude_none=True)
         org_role_id = updates.pop("org_role_id", None)
+        bio = updates.pop("bio", None)
         if "years_experience" in updates:
             updates["years_experience"] = max(0, min(20, updates["years_experience"]))
 
@@ -146,9 +149,32 @@ class AdminService:
             self._validate_assignable_org_role(org_role_id)
             self.role_repo.assign_org_role(user.id, org_role_id, current_user.id)
 
+        if bio is not None:
+            self._upsert_bio(user, bio)
+
         self.db.commit()
         self.db.refresh(user)
         return self._to_detail(user)
+
+    def _upsert_bio(self, user: User, bio: str) -> None:
+        """Set WorkerProfile.bio and refresh the NLP embedding.
+
+        Skips silently if the user has no WorkerProfile yet (no seniority data).
+        Embedding refresh failure does not roll back the bio write.
+        """
+        wp = user.worker_profile
+        if wp is None:
+            return
+        if wp.bio == bio:
+            return
+        wp.bio = bio
+        self.db.flush()
+        try:
+            from app.services.worker_profile_service import _refresh_bio_embedding
+            if bio:
+                _refresh_bio_embedding(wp, self.db)
+        except Exception:
+            pass
 
     def deactivate_user(self, user_id: int, current_user: User) -> None:
         if user_id == current_user.id:

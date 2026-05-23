@@ -7,11 +7,13 @@ import { LoginPage } from '@/features/auth/login-page'
 import { BoardPage } from '@/features/board/board-page'
 import { HomePage } from '@/features/home/home-page'
 import { MembersPage } from '@/features/members/members-page'
+import { ProjectDashboard } from '@/features/projects/project-dashboard'
 import { ProjectsPage } from '@/features/projects/projects-page'
 import { AdminLayout } from '@/features/admin/AdminLayout'
 import { DashboardPage } from '@/features/admin/DashboardPage'
 import { UsersPage } from '@/features/admin/UsersPage'
 import { RolesPage } from '@/features/admin/RolesPage'
+import { CategoriesPage } from '@/features/admin/CategoriesPage'
 import { AccountSettingsPage } from '@/features/settings/AccountSettingsPage'
 import { ProjectSettingsPage } from '@/features/settings/ProjectSettingsPage'
 
@@ -25,7 +27,8 @@ export default function App() {
         <Route element={<ProtectedRoute />}>
           <Route element={<AppShell />}>
             <Route path="/projects" element={<ProjectsPage />} />
-            <Route path="/projects/:projectId" element={<BoardPage />} />
+            <Route path="/projects/:projectId" element={<ProjectDashboard />} />
+            <Route path="/projects/:projectId/board" element={<BoardPage />} />
             <Route path="/projects/:projectId/members" element={<MembersPage />} />
             <Route path="/projects/:projectId/settings" element={<ProjectSettingsPage />} />
             <Route path="/settings" element={<AccountSettingsPage />} />
@@ -33,6 +36,7 @@ export default function App() {
               <Route index element={<DashboardPage />} />
               <Route path="users" element={<UsersPage />} />
               <Route path="roles" element={<RolesPage />} />
+              <Route path="categories" element={<CategoriesPage />} />
             </Route>
           </Route>
         </Route>

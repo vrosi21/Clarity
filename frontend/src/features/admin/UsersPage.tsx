@@ -13,14 +13,14 @@ import type { UserDetail } from '@/types'
 import { useAuthStore } from '@/store/auth-store'
 import { CreateUserDialog } from './CreateUserDialog'
 import { EditUserDialog } from './EditUserDialog'
-import { SkillProfileDialog } from './SkillProfileDialog'
+import { WorkerProfileSheet } from './worker-profile-sheet'
 
 export function UsersPage() {
   const qc = useQueryClient()
   const currentUser = useAuthStore((s) => s.user)
   const [createOpen, setCreateOpen] = useState(false)
   const [editUser, setEditUser] = useState<UserDetail | null>(null)
-  const [skillUser, setSkillUser] = useState<UserDetail | null>(null)
+  const [workerProfileUser, setWorkerProfileUser] = useState<UserDetail | null>(null)
 
   const { data: users, isPending } = useQuery({
     queryKey: ['admin', 'users'],
@@ -93,7 +93,12 @@ export function UsersPage() {
                       <Button variant="ghost" size="icon" onClick={() => setEditUser(u)} title="Edit">
                         <UserPen className="h-4 w-4" />
                       </Button>
-                      <Button variant="ghost" size="icon" onClick={() => setSkillUser(u)} title="Skills">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => setWorkerProfileUser(u)}
+                        title="Worker profile"
+                      >
                         <Settings className="h-4 w-4" />
                       </Button>
                       {u.id !== currentUser?.id && (
@@ -121,7 +126,10 @@ export function UsersPage() {
 
       <CreateUserDialog open={createOpen} onOpenChange={setCreateOpen} />
       <EditUserDialog user={editUser} onClose={() => setEditUser(null)} />
-      <SkillProfileDialog user={skillUser} onClose={() => setSkillUser(null)} />
+      <WorkerProfileSheet
+        user={workerProfileUser}
+        onClose={() => setWorkerProfileUser(null)}
+      />
     </div>
   )
 }

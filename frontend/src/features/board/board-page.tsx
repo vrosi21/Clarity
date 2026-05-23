@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { Settings, Users } from 'lucide-react'
+import { ChevronLeft, Settings2 } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 
@@ -9,6 +9,7 @@ import { ticketsApi } from '@/api/tickets'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { BoardColumn } from '@/features/board/board-column'
+import { ProjectSettingsSheet } from '@/features/settings/ProjectSettingsSheet'
 import { CreateTicketDialog } from '@/features/board/create-ticket-dialog'
 import { TicketSheet } from '@/features/ticket/ticket-sheet'
 import type { Ticket } from '@/types'
@@ -19,6 +20,7 @@ export function BoardPage() {
 
   const [createTicketStageId, setCreateTicketStageId] = useState<number | null>(null)
   const [openTicketId, setOpenTicketId] = useState<number | null>(null)
+  const [settingsOpen, setSettingsOpen] = useState(false)
 
   const { data: project } = useQuery({
     queryKey: ['project', id],
@@ -71,17 +73,14 @@ export function BoardPage() {
             <p className="truncate text-xs text-muted-foreground">{project.description}</p>
           )}
         </div>
-        <div className="flex items-center gap-2">
-          <Button variant="ghost" size="sm" asChild>
-            <Link to={`/projects/${id}/members`}>
-              <Users className="h-4 w-4" />
-              Members
-            </Link>
+        <div className="flex items-center gap-1">
+          <Button variant="ghost" size="icon" onClick={() => setSettingsOpen(true)} title="Board settings">
+            <Settings2 className="h-4 w-4" />
           </Button>
           <Button variant="ghost" size="sm" asChild>
-            <Link to={`/projects/${id}/settings`}>
-              <Settings className="h-4 w-4" />
-              Settings
+            <Link to={`/projects/${id}`}>
+              <ChevronLeft className="h-4 w-4" />
+              Dashboard
             </Link>
           </Button>
         </div>
@@ -132,6 +131,13 @@ export function BoardPage() {
         ticketId={openTicketId}
         onOpenChange={(open) => !open && setOpenTicketId(null)}
         stages={stages ?? []}
+      />
+
+      <ProjectSettingsSheet
+        open={settingsOpen}
+        onOpenChange={setSettingsOpen}
+        projectId={id}
+        projectName={project?.name}
       />
     </div>
   )

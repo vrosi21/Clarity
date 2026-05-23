@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Boolean, Enum, Float, ForeignKey, Integer
+from sqlalchemy import Boolean, Enum, Float, ForeignKey, Integer, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base
@@ -31,6 +31,7 @@ class WorkerProfile(Base):
     base_productivity: Mapped[float] = mapped_column(Float, nullable=False, default=1.0)
     burnout_threshold: Mapped[int] = mapped_column(Integer, nullable=False, default=2400)
     is_available: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    bio: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     user: Mapped[User] = relationship(back_populates="worker_profile")
     skill_profiles: Mapped[list[WorkerSkillProfile]] = relationship(

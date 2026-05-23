@@ -26,6 +26,7 @@ export interface User {
   full_name: string | null
   years_experience: number
   is_active: boolean
+  bio: string | null
   org_role: OrgRoleInfo | null
 }
 
@@ -100,7 +101,9 @@ export interface UserDetail {
   is_active: boolean
   org_role_id: number | null
   org_role_name: string | null
-  skills: SkillProfile[]
+  bio: string | null
+  /** @deprecated retained for backwards compatibility with legacy slider UI. */
+  skills?: SkillProfile[]
 }
 
 export interface SkillProfile {
@@ -139,12 +142,64 @@ export interface DashboardStats {
   workload_by_user: { username: string; assigned_ticket_count: number }[]
 }
 
-// Helpers exported for convenience.
+export interface WorkerSuggestion {
+  user_id: number
+  username: string
+  score: number
+  proficiency: number
+  load_ratio: number
+  reasons: string[]
+}
+
+// ── LangChain/Grok suggestions (POST /projects/{id}/tickets/suggest) ─────────
+// Single unified endpoint for all frontend suggestions.
+
+export interface ComplexityResult {
+  score: number
+  reasoning: string
+}
+
+export interface CategoryResult {
+  match_id: number | null
+  match_name: string | null
+  new_suggestion: string | null
+  confidence: number
+}
+
+export interface TagResult {
+  suggested_tags: string[]
+  new_suggestions: string[]
+}
+
+export interface SuggestResponse {
+  complexity: ComplexityResult | null
+  category: CategoryResult | null
+  tags: TagResult | null
+  workers: WorkerSuggestion[]
+}
+
+// ── Skill suggestion (POST /users/me/skills/suggest) ─────────────────────────
+
+export interface CategoryProficiency {
+  category: string
+  proficiency: number
+}
+
+export interface SkillSuggestResponse {
+  skills: string[]
+  primary_category: string | null
+  seniority_hint: string | null
+  category_proficiencies: CategoryProficiency[]
+}
+
+// ── Misc ─────────────────────────────────────────────────────────────────────
+
 export const PRIORITIES: Priority[] = ['p1', 'p2', 'p3', 'p4', 'p5']
+
 export const PRIORITY_LABEL: Record<Priority, string> = {
-  p1: 'P1 — Critical',
-  p2: 'P2 — High',
-  p3: 'P3 — Medium',
-  p4: 'P4 — Low',
-  p5: 'P5 — Trivial',
+  p1: 'P1 – Critical',
+  p2: 'P2 – High',
+  p3: 'P3 – Medium',
+  p4: 'P4 – Low',
+  p5: 'P5 – Trivial',
 }

@@ -17,6 +17,7 @@ class AdminUserUpdate(BaseModel):
     years_experience: int | None = None
     is_active: bool | None = None
     org_role_id: int | None = None
+    bio: str | None = None
 
 
 class SkillProfileEntry(BaseModel):
@@ -37,6 +38,7 @@ class UserDetailOut(BaseModel):
     is_active: bool
     org_role_id: int | None
     org_role_name: str | None
+    bio: str | None = None
     skills: list[SkillProfileEntry] = []
     model_config = ConfigDict(from_attributes=True)
 

@@ -16,6 +16,7 @@ class WorkerProfileUpdate(BaseModel):
     base_productivity: float | None = Field(default=None, gt=0)
     burnout_threshold: int | None = Field(default=None, gt=0)
     is_available: bool | None = None
+    bio: str | None = Field(default=None, max_length=4000)
 
 
 class SkillProfileResponse(BaseModel):
@@ -39,6 +40,7 @@ class WorkerProfileResponse(BaseModel):
     base_productivity: float
     burnout_threshold: int
     is_available: bool
+    bio: str | None = None
     skill_profiles: list[SkillProfileResponse] = []
 
 

@@ -14,6 +14,7 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
 import {
   Select,
   SelectContent,
@@ -40,6 +41,7 @@ export function EditUserDialog({ user, onClose }: Props) {
   const [yearsExp, setYearsExp] = useState(0)
   const [isActive, setIsActive] = useState(true)
   const [orgRoleId, setOrgRoleId] = useState<number | null>(null)
+  const [bio, setBio] = useState<string>('')
 
   const { data: orgRoles } = useQuery({
     queryKey: ['roles', 'org'],
@@ -59,6 +61,7 @@ export function EditUserDialog({ user, onClose }: Props) {
       setYearsExp(user.years_experience)
       setIsActive(user.is_active)
       setOrgRoleId(user.org_role_id ?? null)
+      setBio(user.bio ?? '')
     }
   }, [user])
 
@@ -87,6 +90,7 @@ export function EditUserDialog({ user, onClose }: Props) {
       years_experience: Math.max(0, Math.min(20, yearsExp)),
       is_active: isActive,
       org_role_id: orgRoleId,
+      bio: bio.trim() || null,
     })
   }
 
@@ -145,6 +149,18 @@ export function EditUserDialog({ user, onClose }: Props) {
             {isSelf && (
               <p className="text-xs text-muted-foreground mt-1">Cannot change your own role</p>
             )}
+          </div>
+          <div>
+            <Label>Bio / Skills description</Label>
+            <Textarea
+              rows={3}
+              value={bio}
+              onChange={(e) => setBio(e.target.value)}
+              placeholder="Free-text bio used by the assignment engine"
+            />
+            <p className="mt-1 text-xs text-muted-foreground">
+              Use the Worker Profile sheet for skill extraction with bubble suggestions.
+            </p>
           </div>
           <label className="flex items-center gap-2 text-sm">
             <input

@@ -7,12 +7,14 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Separator } from '@/components/ui/separator'
+import { Textarea } from '@/components/ui/textarea'
 import { useAuthStore } from '@/store/auth-store'
 
 export function AccountSettingsPage() {
   const user = useAuthStore((s) => s.user)
 
   const [username, setUsername] = useState(user?.username ?? '')
+  const [bio, setBio] = useState((user as any)?.bio ?? '')
   const [currentPassword, setCurrentPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
@@ -27,6 +29,13 @@ export function AccountSettingsPage() {
     },
     onError: (err: any) =>
       toast.error(err?.response?.data?.detail ?? 'Failed to update account'),
+  })
+
+  const bioMutation = useMutation({
+    mutationFn: () => usersApi.updateSelf({ bio: bio.trim() || null }),
+    onSuccess: () => toast.success('Bio saved'),
+    onError: (err: any) =>
+      toast.error(err?.response?.data?.detail ?? 'Failed to save bio'),
   })
 
   const submit = () => {
@@ -65,6 +74,25 @@ export function AccountSettingsPage() {
         <p className="text-xs text-muted-foreground">
           Contact an admin to update your full name, email, or experience level.
         </p>
+      </section>
+
+      <Separator />
+
+      {/* Bio */}
+      <section className="space-y-3">
+        <h2 className="text-base font-medium">Bio / Skills</h2>
+        <Textarea
+          rows={4}
+          value={bio}
+          onChange={(e) => setBio(e.target.value)}
+          placeholder='e.g. "Senior Python developer. FastAPI, PostgreSQL, Kubernetes."'
+        />
+        <p className="text-xs text-muted-foreground">
+          Used by the assignment engine to match you with relevant tickets.
+        </p>
+        <Button onClick={() => bioMutation.mutate()} disabled={bioMutation.isPending}>
+          Save bio
+        </Button>
       </section>
 
       <Separator />

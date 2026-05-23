@@ -4,8 +4,8 @@ import { useState } from 'react'
 import { toast } from 'sonner'
 
 import { categoriesApi } from '@/api/categories'
-import { membersApi } from '@/api/members'
 import { ticketsApi } from '@/api/tickets'
+import { SmartSuggestionsPanel } from '@/components/common/smart-suggestions-panel'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -26,10 +26,12 @@ import {
 } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import { DurationInput } from '@/components/common/duration-input'
+import { useRecommenderSettings } from '@/hooks/use-recommender-settings'
+import { useLlmSuggestions } from '@/hooks/use-llm-suggestions'
+import { tagsApi } from '@/api/tags'
 import { getApiErrorMessage } from '@/lib/utils'
 import { PRIORITIES, PRIORITY_LABEL, type Priority } from '@/types'
-
-const COMPLEXITY_OPTIONS = [1, 2, 3, 4, 5] as const
+import { useAuthStore } from '@/store/auth-store'
 
 interface Props {
   open: boolean
@@ -42,31 +44,71 @@ export function CreateTicketDialog({ open, onOpenChange, projectId, defaultStage
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [priority, setPriority] = useState<Priority>('p3')
-  const [complexity, setComplexity] = useState(3)
+  const [storyPoints, setStoryPoints] = useState(3)
   const [estimated, setEstimated] = useState<number | null>(null)
   const [categoryId, setCategoryId] = useState<string>('none')
+  const [panelCategoryIds, setPanelCategoryIds] = useState<number[]>([])
   const [assigneeId, setAssigneeId] = useState<string>('none')
+  const [selectedTagNames, setSelectedTagNames] = useState<string[]>([])
+  const { settings: recSettings, update: updateRecSettings } = useRecommenderSettings(projectId)
   const queryClient = useQueryClient()
+  const user = useAuthStore((s) => s.user)
+  const canManageCategories = !!user?.org_role?.permissions?.includes('categories:manage')
 
   const { data: categories } = useQuery({
     queryKey: ['categories'],
     queryFn: categoriesApi.list,
     staleTime: 60_000 * 60,
   })
-  const { data: members } = useQuery({
-    queryKey: ['members', projectId],
-    queryFn: () => membersApi.list(projectId),
+
+  const { suggestData, suggestLoading } = useLlmSuggestions({
+    projectId,
+    title,
+    description,
+    categoryIds: panelCategoryIds,
+    complexity: storyPoints,
+    enabled: open,
   })
 
   const reset = () => {
     setTitle('')
     setDescription('')
     setPriority('p3')
-    setComplexity(3)
+    setStoryPoints(3)
     setEstimated(null)
     setCategoryId('none')
+    setPanelCategoryIds([])
     setAssigneeId('none')
+    setSelectedTagNames([])
   }
+
+  const handleToggleCategory = (id: number) => {
+    setPanelCategoryIds((prev) => {
+      if (prev.includes(id)) {
+        const next = prev.filter((x) => x !== id)
+        if (prev[0] === id) setCategoryId(next.length > 0 ? String(next[0]) : 'none')
+        return next
+      } else {
+        if (prev.length === 0) setCategoryId(String(id))
+        return [...prev, id]
+      }
+    })
+  }
+
+  const handleSelectStoryPoints = (v: number) => setStoryPoints(v)
+
+  const handleCreateCategory = async (name: string) => {
+    const cat = await categoriesApi.create(name)
+    queryClient.invalidateQueries({ queryKey: ['categories'] })
+    setPanelCategoryIds((prev) => {
+      if (prev.length === 0) setCategoryId(String(cat.id))
+      return prev.includes(cat.id) ? prev : [...prev, cat.id]
+    })
+    toast.success(`Category "${cat.name}" created`)
+  }
+
+  const handleSelectWorker = (id: number | null) =>
+    setAssigneeId(id === null ? 'none' : String(id))
 
   const mutation = useMutation({
     mutationFn: () =>
@@ -74,7 +116,7 @@ export function CreateTicketDialog({ open, onOpenChange, projectId, defaultStage
         title,
         description: description || undefined,
         priority,
-        complexity,
+        complexity: storyPoints,
         stage_id: defaultStageId,
         category_id: categoryId === 'none' ? null : Number(categoryId),
         assignee_id: assigneeId === 'none' ? null : Number(assigneeId),
@@ -126,6 +168,44 @@ export function CreateTicketDialog({ open, onOpenChange, projectId, defaultStage
             />
           </div>
 
+          <SmartSuggestionsPanel
+            suggestData={suggestData}
+            suggestLoading={suggestLoading}
+            titleNonEmpty={title.trim().length > 0}
+            autoAccept={recSettings.auto_accept}
+            threshold={recSettings.threshold}
+            onAutoAcceptChange={(v) => updateRecSettings({ auto_accept: v })}
+            allCategories={categories ?? []}
+            selectedCategoryIds={panelCategoryIds}
+            onToggleCategory={handleToggleCategory}
+            onResetCategories={(ids) => {
+              setPanelCategoryIds(ids)
+              setCategoryId(ids.length > 0 ? String(ids[0]) : 'none')
+            }}
+            selectedStoryPoints={storyPoints}
+            onSelectStoryPoints={handleSelectStoryPoints}
+            selectedWorkerId={assigneeId === 'none' ? null : Number(assigneeId)}
+            onSelectWorker={handleSelectWorker}
+            canManageCategories={canManageCategories}
+            onCreateCategory={handleCreateCategory}
+            selectedTagNames={selectedTagNames}
+            onTagAccept={(name) =>
+              setSelectedTagNames((prev) => prev.includes(name) ? prev : [...prev, name])
+            }
+            onTagReject={(name) =>
+              setSelectedTagNames((prev) => prev.filter((t) => t !== name))
+            }
+            onNewTagConfirm={async (name) => {
+              try {
+                await tagsApi.create(name)
+                setSelectedTagNames((prev) => prev.includes(name) ? prev : [...prev, name])
+                toast.success(`Tag "${name}" created`)
+              } catch (e: any) {
+                toast.error(e?.response?.data?.detail ?? 'Failed to create tag')
+              }
+            }}
+          />
+
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Priority</Label>
@@ -143,24 +223,6 @@ export function CreateTicketDialog({ open, onOpenChange, projectId, defaultStage
               </Select>
             </div>
             <div className="space-y-2">
-              <Label>Complexity</Label>
-              <Select value={String(complexity)} onValueChange={(v) => setComplexity(Number(v))}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {COMPLEXITY_OPTIONS.map((c) => (
-                    <SelectItem key={c} value={String(c)}>
-                      {c} / 5
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
               <Label htmlFor="estimated">Estimate (optional)</Label>
               <DurationInput
                 id="estimated"
@@ -168,39 +230,6 @@ export function CreateTicketDialog({ open, onOpenChange, projectId, defaultStage
                 onChange={setEstimated}
               />
             </div>
-            <div className="space-y-2">
-              <Label>Category</Label>
-              <Select value={categoryId} onValueChange={setCategoryId}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">No category</SelectItem>
-                  {categories?.map((c) => (
-                    <SelectItem key={c.id} value={String(c.id)}>
-                      {c.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <Label>Assignee</Label>
-            <Select value={assigneeId} onValueChange={setAssigneeId}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">Unassigned</SelectItem>
-                {members?.map((m) => (
-                  <SelectItem key={m.user_id} value={String(m.user_id)}>
-                    {m.username}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
           </div>
 
           <DialogFooter>
@@ -208,7 +237,7 @@ export function CreateTicketDialog({ open, onOpenChange, projectId, defaultStage
               Cancel
             </Button>
             <Button type="submit" disabled={mutation.isPending || !title.trim()}>
-              {mutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+              {mutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Create ticket
             </Button>
           </DialogFooter>
