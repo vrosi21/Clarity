@@ -15,7 +15,10 @@ from app.models.project_member import ProjectMember
 from app.models.project_role_constraint import ProjectRoleConstraint
 from app.models.rl_project_config import RLProjectConfig
 from app.models.role import Role
+from app.models.simulation_run import SimulationRun
 from app.models.stage import Stage
+from app.models.synthetic_team import SyntheticTeam
+from app.models.synthetic_worker import SyntheticWorker
 from app.models.tag import Tag
 from app.models.ticket import Ticket
 from app.models.ticket_link import TicketLink
@@ -38,8 +41,11 @@ __all__ = [
     "Role",
     "RoleScope",
     "SeniorityLevel",
+    "SimulationRun",
     "Stage",
     "StageType",
+    "SyntheticTeam",
+    "SyntheticWorker",
     "Tag",
     "Ticket",
     "TicketLink",

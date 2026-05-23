@@ -6,6 +6,7 @@ from app.api.v1.routers.suggest import (
     skill_suggest_router,
     ticket_suggest_router,
 )
+from app.api.v1.routers.simulation import router as simulation_router
 from app.api.v1.routers.tags import router as tags_router
 from app.api.v1.routers.auth import router as auth_router, users_router
 from app.api.v1.routers.categories import router as categories_router
@@ -39,6 +40,7 @@ router.include_router(admin_router)
 router.include_router(global_admin_router)
 router.include_router(sandbox_router)
 router.include_router(assignment_router)
+router.include_router(simulation_router)
 router.include_router(tags_router)
 router.include_router(ticket_suggest_router)
 router.include_router(skill_suggest_router)
