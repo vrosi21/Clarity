@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import {
   ChevronDown,
+  FlaskConical,
   LayoutDashboard,
   LogOut,
   Moon,
@@ -50,6 +51,7 @@ export function Sidebar() {
   const [adminOpen, setAdminOpen] = useState(false)
 
   const isAdmin = !!user?.org_role?.permissions?.includes('org:manage_users')
+  const canSimulate = !!user?.org_role?.permissions?.includes('simulation:run')
 
   const { data: projects, isPending } = useQuery({
     queryKey: ['projects'],
@@ -126,6 +128,26 @@ export function Sidebar() {
             </nav>
           </div>
         </div>
+
+        {/* Simulation link */}
+        {canSimulate && (
+          <div className="px-2">
+            <NavLink
+              to="/simulation"
+              className={({ isActive }) =>
+                cn(
+                  'flex items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors',
+                  isActive
+                    ? 'bg-accent/40 font-medium text-accent-foreground'
+                    : 'text-foreground hover:bg-accent/20',
+                )
+              }
+            >
+              <FlaskConical className="h-4 w-4" />
+              Simulation
+            </NavLink>
+          </div>
+        )}
 
         {/* Admin section */}
         {isAdmin && (

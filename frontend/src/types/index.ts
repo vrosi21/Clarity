@@ -198,6 +198,141 @@ export interface SkillSuggestResponse {
 
 export const PRIORITIES: Priority[] = ['p1', 'p2', 'p3', 'p4', 'p5']
 
+// ── Simulation ────────────────────────────────────────────────────────────────
+
+export type SimulationEventType = 'assigned' | 'stage_changed' | 'completed' | 'blocked'
+
+export interface SimulationEvent {
+  t: number
+  type: SimulationEventType
+  ticket_id: number
+  ticket_title: string
+  worker_id: number
+  worker_name: string
+  from_stage: string | null
+  to_stage: string | null
+  q_value: number | null
+}
+
+export interface SimulationSummaryStats {
+  total_time: number
+  avg_efficiency: number
+  n_tasks: number
+  n_blocked: number
+  n_workers: number
+}
+
+export interface SimulationRun {
+  id: number
+  project_id: number
+  created_by: number
+  created_at: string
+  team_source: 'project' | 'synthetic'
+  synthetic_team_id: number | null
+  rl_config_snapshot: Record<string, number>
+  event_log: SimulationEvent[]
+  summary: SimulationSummaryStats | Record<string, never>
+  status: 'completed' | 'failed'
+}
+
+export interface SimulationRunSummary {
+  id: number
+  project_id: number
+  created_by: number
+  created_at: string
+  team_source: 'project' | 'synthetic'
+  synthetic_team_id: number | null
+  summary: SimulationSummaryStats | Record<string, never>
+  status: 'completed' | 'failed'
+}
+
+export interface SyntheticWorker {
+  id: number
+  team_id: number
+  name: string
+  seniority: 'junior' | 'mid' | 'senior' | 'lead'
+  years_experience: number
+  primary_category: string
+  category_proficiency: Record<string, number>
+  base_productivity: number
+  burnout_threshold: number
+}
+
+export interface SyntheticWorkerCreatePayload {
+  name: string
+  seniority: 'junior' | 'mid' | 'senior' | 'lead'
+  years_experience: number
+  primary_category: string
+  category_proficiency: Record<string, number>
+  base_productivity: number
+  burnout_threshold: number
+}
+
+export interface SyntheticTeam {
+  id: number
+  name: string
+  description: string | null
+  created_by: number
+  created_at: string
+  workers: SyntheticWorker[]
+}
+
+export interface SyntheticTeamListItem {
+  id: number
+  name: string
+  description: string | null
+  created_by: number
+  created_at: string
+  worker_count: number
+}
+
+export interface SyntheticTeamCreatePayload {
+  name: string
+  description?: string | null
+  workers: SyntheticWorkerCreatePayload[]
+}
+
+export interface RLConfigOverride {
+  temperature?: number
+  w_priority?: number
+  w_efficiency?: number
+  w_overload?: number
+  w_throughput?: number
+  gamma?: number
+}
+
+export interface SimulationRunPayload {
+  team_source: 'project' | 'synthetic'
+  synthetic_team_id?: number | null
+  rl_config_overrides?: RLConfigOverride | null
+}
+
+export interface RLProjectConfig {
+  project_id: number
+  temperature: number
+  w_priority: number
+  w_efficiency: number
+  w_overload: number
+  w_throughput: number
+  gamma: number
+  fine_tune_every_n_completions: number
+  replay_buffer_max_size: number
+}
+
+export interface WorkerProfile {
+  id: number
+  user_id: number
+  username: string | null
+  seniority: 'junior' | 'mid' | 'senior' | 'lead'
+  years_experience: number
+  primary_category_id: number | null
+  base_productivity: number
+  burnout_threshold: number
+  is_available: boolean
+  bio: string | null
+  skill_profiles: { id: number; category_id: number; proficiency: number; efficiency: number | null }[]
+}
+
 export const PRIORITY_LABEL: Record<Priority, string> = {
   p1: 'P1 – Critical',
   p2: 'P2 – High',

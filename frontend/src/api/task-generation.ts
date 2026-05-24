@@ -55,17 +55,26 @@ export async function streamGenerateTasks(
   handlers: GenerationHandlers,
   signal?: AbortSignal,
 ): Promise<void> {
+  console.log('[streamGenerateTasks] fetch start', projectId, config)
   const token = useAuthStore.getState().token
-  const res = await fetch(`/api/v1/projects/${projectId}/generate-tasks`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Accept: 'text/event-stream',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    },
-    body: JSON.stringify({ generation_config: config }),
-    signal,
-  })
+  let res: Response
+  try {
+    res = await fetch(`/api/v1/projects/${projectId}/generate-tasks`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'text/event-stream',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify({ generation_config: config }),
+      signal,
+    })
+  } catch (e) {
+    console.error('[streamGenerateTasks] fetch threw', e)
+    handlers.onError?.(String((e as Error)?.message ?? e))
+    return
+  }
+  console.log('[streamGenerateTasks] response', res.status, res.headers.get('content-type'))
 
   if (!res.ok || !res.body) {
     handlers.onError?.(`HTTP ${res.status}`)

@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { ChevronLeft, Settings2 } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
@@ -13,11 +13,15 @@ import { GenerationOverlay } from '@/features/board/generation-overlay'
 import { ProjectSettingsSheet } from '@/features/settings/ProjectSettingsSheet'
 import { CreateTicketDialog } from '@/features/board/create-ticket-dialog'
 import { TicketSheet } from '@/features/ticket/ticket-sheet'
+import { useGenerationStore } from '@/store/generation-store'
 import type { Ticket } from '@/types'
+
+const REVEAL_INTERVAL_MS = 180
 
 export function BoardPage() {
   const { projectId } = useParams<{ projectId: string }>()
   const id = Number(projectId)
+  const queryClient = useQueryClient()
 
   const [createTicketStageId, setCreateTicketStageId] = useState<number | null>(null)
   const [openTicketId, setOpenTicketId] = useState<number | null>(null)
@@ -57,6 +61,45 @@ export function BoardPage() {
     }
     return map
   }, [tickets])
+
+  // ── Generation reveal pump: drains one ticket from the store every 180ms ──
+  const genActive = useGenerationStore(
+    (s) => s.projectId === id && (s.status === 'analysing' || s.status === 'generating' || s.status === 'done'),
+  )
+  const genStatus = useGenerationStore((s) => s.status)
+  const genTickets = useGenerationStore((s) => s.tickets)
+  const genVisibleCount = useGenerationStore((s) => s.visibleCount)
+  const genTargetCount = useGenerationStore((s) => s.targetCount)
+  const revealOne = useGenerationStore((s) => s.revealOne)
+
+  useEffect(() => {
+    if (!genActive) return
+    if (genVisibleCount >= genTickets.length) return
+    const t = setTimeout(() => revealOne(), REVEAL_INTERVAL_MS)
+    return () => clearTimeout(t)
+  }, [genActive, genVisibleCount, genTickets.length, revealOne])
+
+  // Once status reaches 'done' AND we've revealed every ticket, refresh the
+  // real query so server tickets replace preview cards.
+  useEffect(() => {
+    if (genStatus === 'done' && genVisibleCount >= genTickets.length) {
+      queryClient.invalidateQueries({ queryKey: ['tickets', id] })
+    }
+  }, [genStatus, genVisibleCount, genTickets.length, queryClient, id])
+
+  const visibleGenTickets = useMemo(
+    () => genTickets.slice(0, genVisibleCount),
+    [genTickets, genVisibleCount],
+  )
+  const startStageId = useMemo(() => {
+    if (!stages) return null
+    const start = stages.find((s) => s.type === 'start')
+    return (start ?? stages[0])?.id ?? null
+  }, [stages])
+
+  const pendingSkeletons = genActive
+    ? Math.max(0, genTargetCount - visibleGenTickets.length)
+    : 0
 
   if (Number.isNaN(id)) {
     return <div className="p-8 text-sm text-muted-foreground">Invalid project ID.</div>
@@ -113,6 +156,15 @@ export function BoardPage() {
                 tickets={ticketsByStage.get(s.id) ?? []}
                 onCreateTicket={() => setCreateTicketStageId(s.id)}
                 onTicketClick={(t) => setOpenTicketId(t.id)}
+                generation={
+                  s.id === startStageId
+                    ? {
+                        active: genActive && genStatus !== 'done',
+                        visibleTickets: visibleGenTickets,
+                        pendingSkeletons,
+                      }
+                    : undefined
+                }
               />
             ))}
           </div>

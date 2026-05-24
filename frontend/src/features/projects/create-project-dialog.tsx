@@ -5,7 +5,7 @@ import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 
 import { projectsApi } from '@/api/projects'
-import type { TaskGenerationConfig } from '@/api/task-generation'
+import { streamGenerateTasks, type TaskGenerationConfig } from '@/api/task-generation'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -29,10 +29,11 @@ interface Props {
   onOpenChange: (open: boolean) => void
 }
 
+// Defaults match Tasks=15 + Complexity=3 (Medium) in GenerationConfigPanel.
 const DEFAULT_GEN_CONFIG: TaskGenerationConfig = {
   complexity_profile: 'medium',
-  total_hours_min: 80,
-  total_hours_max: 140,
+  total_hours_min: 150,
+  total_hours_max: 210,
   task_count: 15,
 }
 
@@ -45,16 +46,45 @@ export function CreateProjectDialog({ open, onOpenChange }: Props) {
   const navigate = useNavigate()
   const { can } = usePermissions()
   const canGenerate = can('simulation:run')
-  const scheduleGeneration = useGenerationStore((s) => s.schedule)
+  const startGen = useGenerationStore((s) => s.start)
+  const setDiffusion = useGenerationStore((s) => s.setDiffusion)
+  const appendBatch = useGenerationStore((s) => s.appendBatch)
+  const finishGen = useGenerationStore((s) => s.finish)
+  const failGen = useGenerationStore((s) => s.fail)
 
   const mutation = useMutation({
     mutationFn: () => projectsApi.create({ name, description: description || undefined }),
     onSuccess: (project) => {
       queryClient.invalidateQueries({ queryKey: ['projects'] })
       toast.success(`Project "${project.name}" created`)
+
+      console.log('[create-project] success', {
+        projectId: project.id,
+        genEnabled,
+        canGenerate,
+        config: genConfig,
+      })
       if (genEnabled && canGenerate) {
-        scheduleGeneration({ projectId: project.id, config: genConfig })
+        console.log('[create-project] launching streamGenerateTasks', project.id)
+        // Kick the stream off here (NOT in a useEffect) so React strict-mode
+        // double-mount can't abort the fetch before it leaves the browser.
+        startGen(project.id, genConfig.task_count)
+        streamGenerateTasks(
+          project.id,
+          genConfig,
+          {
+            onDiffusion: (plan) => setDiffusion(plan),
+            // Don't invalidate per batch — the BoardPage reveal pump drains
+            // tickets from the store at a controlled cadence (one per ~180ms).
+            // It invalidates the tickets query only after the final reveal so
+            // server-fetched cards replace the preview cards in one swap.
+            onBatch: (_i, tickets) => appendBatch(tickets),
+            onDone: () => finishGen(),
+            onError: (msg) => failGen(msg),
+          },
+        ).catch((e) => failGen(String(e?.message ?? e)))
       }
+
       onOpenChange(false)
       setName('')
       setDescription('')
@@ -105,19 +135,12 @@ export function CreateProjectDialog({ open, onOpenChange }: Props) {
           </div>
 
           {canGenerate && (
-            <div className="space-y-3 rounded-lg border border-border bg-card p-3">
+            <div className="rounded-lg border border-border bg-card/50 p-3">
               <div className="flex items-center justify-between">
-                <div className="flex items-start gap-2">
-                  <Sparkles className="mt-0.5 h-4 w-4 text-accent-foreground" />
-                  <div>
-                    <Label htmlFor="gen-toggle" className="text-sm font-medium">
-                      Generate with AI
-                    </Label>
-                    <p className="text-xs text-muted-foreground">
-                      Auto-fill your backlog with tickets shaped to the project.
-                    </p>
-                  </div>
-                </div>
+                <Label htmlFor="gen-toggle" className="flex items-center gap-2 text-sm font-medium">
+                  <Sparkles className="h-4 w-4 text-accent-foreground" />
+                  Generate tickets with AI
+                </Label>
                 <Switch
                   id="gen-toggle"
                   checked={genEnabled}

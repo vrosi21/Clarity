@@ -7,16 +7,31 @@ Two phases:
      in batches.
 
 Both phases use Groq via the shared get_llm() singleton and structured output
-via LangChain PydanticOutputParser. Calling code wraps in try/except; failures
-return None / [].
+via LangChain PydanticOutputParser. Both return (output, error) tuples so the
+caller can surface the real failure cause to the user instead of silent None.
 """
 from __future__ import annotations
+
+import logging
+import sys
+import traceback
 
 from app.ml.langchain.llm import get_llm
 from app.ml.langchain.output_schemas import (
     CategoryDiffusionOutput,
     GeneratedTasksOutput,
 )
+
+_log = logging.getLogger(__name__)
+
+
+def _format_error(exc: BaseException) -> str:
+    msg = f"{type(exc).__name__}: {exc}"
+    # Also print full traceback to stderr regardless of logging config.
+    print(f"\n[task_generator] {msg}", file=sys.stderr, flush=True)
+    traceback.print_exc(file=sys.stderr)
+    sys.stderr.flush()
+    return msg
 
 
 _DIFFUSION_TEMPLATE = """
@@ -37,11 +52,12 @@ project clearly needs a domain not covered):
 {categories}
 
 Rules:
-- Return between 2 and 6 categories.
+- You MUST return AT LEAST 2 and AT MOST 6 categories. NEVER return an empty list.
 - Use lowercase, hyphenated, slug-style names (e.g. "ml-ops", "data-pipeline").
 - weights are relative (0.0-1.0); they do NOT need to sum to 1.
 - For complex projects favour 4-6 categories; for simple, 2-3.
 - description should be ONE sentence explaining why this category matters here.
+- If you are unsure, fall back to "backend", "frontend", and "qa" — but never return zero items.
 
 Respond with JSON matching: {format_instructions}
 """.strip()
@@ -70,8 +86,8 @@ Already-generated titles to avoid duplicating:
 {prior_titles}
 
 Rules:
-- Produce EXACTLY {batch_size} tickets in this batch.
-- Each ticket must have a clear, action-oriented title (e.g. "Build login form").
+- You MUST return EXACTLY {batch_size} tickets — never return an empty list.
+- Each ticket MUST have a clear, action-oriented title (e.g. "Build login form").
 - description should be 1-3 sentences of practical detail.
 - category_name must come from the diffusion plan above (use the exact slug).
 - complexity is 1-5 matching the profile:
@@ -81,6 +97,8 @@ Rules:
 - estimated_minutes should reflect the complexity (60-2400 typical range).
 - priority is one of p1, p2, p3, p4, p5 (default p3, p1 only for true blockers).
 - tag_names is a list of UX tags (e.g. "feature", "bug"); prefer from existing.
+- If you are uncertain, output reasonable engineering tickets like "Set up CI",
+  "Write unit tests", "Implement login flow" — but NEVER return an empty list.
 
 Respond with JSON matching: {format_instructions}
 """.strip()
@@ -91,8 +109,12 @@ async def generate_category_diffusion(
     project_description: str,
     config: dict,
     existing_categories: list[dict],
-) -> CategoryDiffusionOutput | None:
-    """Phase 1: propose a weighted category distribution."""
+) -> tuple[CategoryDiffusionOutput | None, str | None]:
+    """Phase 1: propose a weighted category distribution.
+
+    Returns (output, error_message). On success error is None; on failure
+    output is None and error is a concise string describing the cause.
+    """
     try:
         from langchain_core.output_parsers import PydanticOutputParser
         from langchain_core.prompts import ChatPromptTemplate
@@ -107,7 +129,7 @@ async def generate_category_diffusion(
         cat_list = "\n".join(lines) if lines else "(none yet)"
 
         chain = prompt | get_llm() | parser
-        return await chain.ainvoke(
+        out = await chain.ainvoke(
             {
                 "project_name": project_name,
                 "project_description": project_description or "(none provided)",
@@ -119,8 +141,11 @@ async def generate_category_diffusion(
                 "format_instructions": parser.get_format_instructions(),
             }
         )
-    except Exception:
-        return None
+        return out, None
+    except Exception as exc:
+        msg = _format_error(exc)
+        _log.exception("generate_category_diffusion failed: %s", msg)
+        return None, msg
 
 
 async def generate_tasks(
@@ -133,8 +158,11 @@ async def generate_tasks(
     batch_total: int,
     batch_size: int,
     prior_titles: list[str],
-) -> GeneratedTasksOutput | None:
-    """Phase 2: generate `batch_size` concrete tickets for one batch."""
+) -> tuple[GeneratedTasksOutput | None, str | None]:
+    """Phase 2: generate `batch_size` concrete tickets for one batch.
+
+    Returns (output, error_message). On success error is None.
+    """
     try:
         from langchain_core.output_parsers import PydanticOutputParser
         from langchain_core.prompts import ChatPromptTemplate
@@ -154,7 +182,7 @@ async def generate_tasks(
         )
 
         chain = prompt | get_llm() | parser
-        return await chain.ainvoke(
+        out = await chain.ainvoke(
             {
                 "project_name": project_name,
                 "project_description": project_description or "(none provided)",
@@ -171,5 +199,8 @@ async def generate_tasks(
                 "format_instructions": parser.get_format_instructions(),
             }
         )
-    except Exception:
-        return None
+        return out, None
+    except Exception as exc:
+        msg = _format_error(exc)
+        _log.exception("generate_tasks batch %s failed: %s", batch_index, msg)
+        return None, msg

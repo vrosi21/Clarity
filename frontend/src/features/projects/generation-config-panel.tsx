@@ -1,8 +1,5 @@
-import { Sparkles } from 'lucide-react'
-
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Slider } from '@/components/ui/slider'
 import { cn } from '@/lib/utils'
 import type { ComplexityProfile, TaskGenerationConfig } from '@/api/task-generation'
 
@@ -11,101 +8,112 @@ interface Props {
   onChange: (next: TaskGenerationConfig) => void
 }
 
-const PROFILE_LABELS: Record<ComplexityProfile, string> = {
-  simple: 'Simple',
-  medium: 'Medium',
-  complex: 'Complex',
+const TASK_STOPS = [5, 10, 15, 20, 25, 30]
+const COMPLEXITY_STOPS = [1, 2, 3, 4, 5] as const
+const COMPLEXITY_LABEL: Record<number, string> = {
+  1: 'Trivial',
+  2: 'Light',
+  3: 'Medium',
+  4: 'Heavy',
+  5: 'Hardcore',
 }
-const PROFILE_BLURB: Record<ComplexityProfile, string> = {
-  simple: 'Small project, mostly 1–2 point tickets.',
-  medium: 'Balanced mix, 2–3 point tickets dominate.',
-  complex: 'Larger system, plenty of 3–5 point work.',
+
+/** complexity 1–5 → profile + per-task hour range. */
+function complexityToProfile(c: number): {
+  profile: ComplexityProfile
+  hoursPerTaskMin: number
+  hoursPerTaskMax: number
+} {
+  if (c <= 2) return { profile: 'simple', hoursPerTaskMin: 4 + (c - 1) * 2, hoursPerTaskMax: 6 + (c - 1) * 4 }
+  if (c === 3) return { profile: 'medium', hoursPerTaskMin: 10, hoursPerTaskMax: 14 }
+  return { profile: 'complex', hoursPerTaskMin: 12 + (c - 4) * 6, hoursPerTaskMax: 18 + (c - 4) * 10 }
+}
+
+function deriveConfig(taskCount: number, complexity: number): TaskGenerationConfig {
+  const { profile, hoursPerTaskMin, hoursPerTaskMax } = complexityToProfile(complexity)
+  return {
+    complexity_profile: profile,
+    total_hours_min: Math.round(taskCount * hoursPerTaskMin),
+    total_hours_max: Math.round(taskCount * hoursPerTaskMax),
+    task_count: taskCount,
+  }
+}
+
+function inferComplexity(cfg: TaskGenerationConfig): number {
+  // Best-effort reverse from saved config.
+  const avg = (cfg.total_hours_min + cfg.total_hours_max) / 2 / Math.max(cfg.task_count, 1)
+  if (avg <= 6) return 1
+  if (avg <= 9) return 2
+  if (avg <= 13) return 3
+  if (avg <= 19) return 4
+  return 5
 }
 
 export function GenerationConfigPanel({ value, onChange }: Props) {
-  const setProfile = (p: ComplexityProfile) => onChange({ ...value, complexity_profile: p })
-  const setMin = (n: number) =>
-    onChange({ ...value, total_hours_min: Math.min(n, value.total_hours_max - 10) })
-  const setMax = (n: number) =>
-    onChange({ ...value, total_hours_max: Math.max(n, value.total_hours_min + 10) })
-  const setTaskCount = (n: number) =>
-    onChange({ ...value, task_count: Math.max(5, Math.min(50, n)) })
+  const taskCount = value.task_count
+  const complexity = inferComplexity(value)
+
+  const setTaskCount = (n: number) => onChange(deriveConfig(n, complexity))
+  const setComplexity = (c: number) => onChange(deriveConfig(taskCount, c))
 
   return (
-    <div className="space-y-4 rounded-lg border border-accent/30 bg-accent/5 p-4">
-      <div className="flex items-center gap-2 text-sm font-medium">
-        <Sparkles className="h-4 w-4 text-accent-foreground" />
-        Generation settings
-      </div>
+    <div className="space-y-4 border-t border-border/60 pt-3">
+      <StopSlider
+        label="Number of tickets"
+        value={taskCount}
+        stops={TASK_STOPS}
+        onChange={setTaskCount}
+        format={(v) => `${v} tickets`}
+      />
+      <StopSlider
+        label="Complexity"
+        value={complexity}
+        stops={[1, 2, 3, 4, 5]}
+        onChange={setComplexity}
+        format={(v) => COMPLEXITY_LABEL[v] ?? String(v)}
+      />
+      <p className="text-[10px] text-muted-foreground">
+        Higher complexity → larger tickets, more story points on average.
+      </p>
+    </div>
+  )
+}
 
-      <div className="space-y-2">
-        <Label>Complexity profile</Label>
-        <div className="grid grid-cols-3 gap-2">
-          {(['simple', 'medium', 'complex'] as ComplexityProfile[]).map((p) => (
-            <Button
-              key={p}
-              type="button"
-              variant={value.complexity_profile === p ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => setProfile(p)}
-              className={cn(
-                'h-auto flex-col items-start py-2 px-3 text-left',
-              )}
-            >
-              <span className="text-sm font-medium">{PROFILE_LABELS[p]}</span>
-              <span className="text-[10px] font-normal opacity-70">
-                {PROFILE_BLURB[p]}
-              </span>
-            </Button>
-          ))}
-        </div>
-      </div>
+interface StopSliderProps {
+  label: string
+  value: number
+  stops: readonly number[]
+  onChange: (v: number) => void
+  format: (v: number) => string
+}
 
-      <div className="space-y-2">
-        <div className="flex items-center justify-between">
-          <Label>Estimated total hours</Label>
-          <span className="text-sm tabular-nums text-muted-foreground">
-            {value.total_hours_min} – {value.total_hours_max} hours
+function StopSlider({ label, value, stops, onChange, format }: StopSliderProps) {
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between">
+        <Label className="text-xs">{label}</Label>
+        <span className="font-mono text-[10px] text-muted-foreground">{format(value)}</span>
+      </div>
+      <Slider
+        min={0}
+        max={stops.length - 1}
+        step={1}
+        value={stops.indexOf(value) >= 0 ? stops.indexOf(value) : 0}
+        onChange={(idx) => onChange(stops[idx])}
+        aria-label={label}
+      />
+      <div className="flex justify-between px-0.5 text-[9px] text-muted-foreground">
+        {stops.map((s) => (
+          <span
+            key={s}
+            className={cn(
+              'tabular-nums',
+              s === value ? 'font-semibold text-foreground' : '',
+            )}
+          >
+            {s}
           </span>
-        </div>
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <Label className="text-xs text-muted-foreground">Min</Label>
-            <input
-              type="range"
-              min={20}
-              max={500}
-              step={10}
-              value={value.total_hours_min}
-              onChange={(e) => setMin(Number(e.target.value))}
-              className="w-full accent-primary"
-            />
-          </div>
-          <div>
-            <Label className="text-xs text-muted-foreground">Max</Label>
-            <input
-              type="range"
-              min={20}
-              max={500}
-              step={10}
-              value={value.total_hours_max}
-              onChange={(e) => setMax(Number(e.target.value))}
-              className="w-full accent-primary"
-            />
-          </div>
-        </div>
-      </div>
-
-      <div className="space-y-2">
-        <Label htmlFor="task_count">Number of tasks</Label>
-        <Input
-          id="task_count"
-          type="number"
-          min={5}
-          max={50}
-          value={value.task_count}
-          onChange={(e) => setTaskCount(Number(e.target.value))}
-        />
+        ))}
       </div>
     </div>
   )

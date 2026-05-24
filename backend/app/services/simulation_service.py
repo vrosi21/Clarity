@@ -67,7 +67,10 @@ class SimulationService:
             if not tasks:
                 raise ValueError("No tickets found for simulation")
 
-            event_log = self._execute_simulation(workers, tasks, worker_meta, task_meta)
+            event_log = self._execute_simulation(
+                workers, tasks, worker_meta, task_meta,
+                temperature=float(snapshot.get("temperature", 0.3)),
+            )
             summary = self._compute_summary(event_log, workers, tasks)
         except Exception:
             status = "failed"
@@ -244,9 +247,16 @@ class SimulationService:
         tasks: list[SimTask],
         worker_meta: dict[int, dict],
         task_meta: dict[int, dict],
+        temperature: float = 0.3,
     ) -> list[dict[str, Any]]:
-        sim = Simulator()
-        rng = np.random.default_rng(seed=42)
+        # τ scales noise: low τ → tight, deterministic-ish outcomes; high τ → wide spread.
+        # Range 0.05–1.0 mapped to sigma_multiplier 0.4–2.5.
+        from app.ml.simulation.noise import LogNormalNoise
+        sigma_mult = 0.4 + (temperature - 0.05) * (2.5 - 0.4) / (1.0 - 0.05)
+        sim = Simulator(noise_strategy=LogNormalNoise(sigma_multiplier=sigma_mult))
+        # Fresh seed per call so identical configs still produce variance.
+        seed = int(np.random.SeedSequence().entropy % (2**31 - 1))
+        rng = np.random.default_rng(seed)
         sim._assign_arrival_times(tasks, rng)
         rows = sim._simulate(workers, tasks, rng, sprint_id=0)  # noqa: SLF001
 
@@ -261,7 +271,9 @@ class SimulationService:
             w_name = worker_meta.get(worker_id, {}).get("name", f"Worker {worker_id}")
             t_title = task_meta.get(task_id, {}).get("title", f"Ticket {task_id}")
 
-            # assigned event
+            duration = max(t_complete - t_arrive, 1.0)
+
+            # BACKLOG → ASSIGNED
             events.append({
                 "t": round(t_arrive, 2),
                 "type": "assigned",
@@ -274,9 +286,23 @@ class SimulationService:
                 "q_value": None,
             })
 
+            # ASSIGNED → IN_PROGRESS (worker picks it up shortly after)
+            t_start = round(t_arrive + duration * 0.05, 2)
+            events.append({
+                "t": t_start,
+                "type": "stage_changed",
+                "ticket_id": task_id,
+                "ticket_title": t_title,
+                "worker_id": worker_id,
+                "worker_name": w_name,
+                "from_stage": "ASSIGNED",
+                "to_stage": "IN_PROGRESS",
+                "q_value": None,
+            })
+
             if was_blocked:
-                # blocked mid-work
-                t_blocked = round(t_arrive + (t_complete - t_arrive) * 0.4, 2)
+                # IN_PROGRESS → BLOCKED → IN_PROGRESS (mid-work interruption)
+                t_blocked = round(t_arrive + duration * 0.4, 2)
                 events.append({
                     "t": t_blocked,
                     "type": "blocked",
@@ -300,7 +326,21 @@ class SimulationService:
                     "q_value": None,
                 })
 
-            # completed event
+            # IN_PROGRESS → IN_REVIEW (just before completion)
+            t_review = round(t_complete - max(duration * 0.05, 1.0), 2)
+            events.append({
+                "t": t_review,
+                "type": "stage_changed",
+                "ticket_id": task_id,
+                "ticket_title": t_title,
+                "worker_id": worker_id,
+                "worker_name": w_name,
+                "from_stage": "IN_PROGRESS",
+                "to_stage": "IN_REVIEW",
+                "q_value": None,
+            })
+
+            # IN_REVIEW → DONE
             events.append({
                 "t": round(t_complete, 2),
                 "type": "completed",

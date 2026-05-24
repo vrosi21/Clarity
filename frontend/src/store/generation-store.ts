@@ -18,7 +18,10 @@ interface GenerationState {
   status: GenerationStatus
   projectId: number | null
   diffusion: DiffusionPlanItem[]
+  /** All tickets received from SSE so far (any reveal state). */
   tickets: GeneratedTicket[]
+  /** How many of `tickets` are currently shown on the backlog column. */
+  visibleCount: number
   targetCount: number
   errorMessage: string | null
 
@@ -28,6 +31,7 @@ interface GenerationState {
   start: (projectId: number, targetCount: number) => void
   setDiffusion: (plan: DiffusionPlanItem[]) => void
   appendBatch: (tickets: GeneratedTicket[]) => void
+  revealOne: () => void
   finish: () => void
   fail: (message: string) => void
   reset: () => void
@@ -39,6 +43,7 @@ export const useGenerationStore = create<GenerationState>((set, get) => ({
   projectId: null,
   diffusion: [],
   tickets: [],
+  visibleCount: 0,
   targetCount: 0,
   errorMessage: null,
 
@@ -56,11 +61,17 @@ export const useGenerationStore = create<GenerationState>((set, get) => ({
       targetCount,
       diffusion: [],
       tickets: [],
+      visibleCount: 0,
       errorMessage: null,
     }),
   setDiffusion: (plan) => set({ diffusion: plan, status: 'generating' }),
-  appendBatch: (tickets) =>
-    set((s) => ({ tickets: [...s.tickets, ...tickets] })),
+  appendBatch: (newOnes) =>
+    set((s) => ({ tickets: [...s.tickets, ...newOnes] })),
+  revealOne: () =>
+    set((s) => {
+      if (s.visibleCount >= s.tickets.length) return {}
+      return { visibleCount: s.visibleCount + 1 }
+    }),
   finish: () => set({ status: 'done' }),
   fail: (message) => set({ status: 'error', errorMessage: message }),
   reset: () =>
@@ -70,6 +81,7 @@ export const useGenerationStore = create<GenerationState>((set, get) => ({
       projectId: null,
       diffusion: [],
       tickets: [],
+      visibleCount: 0,
       targetCount: 0,
       errorMessage: null,
     }),

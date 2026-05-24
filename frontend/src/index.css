@@ -71,20 +71,61 @@
 }
 
 @layer utilities {
-  /* Custom scrollbar for the kanban board */
+  /* ── Global custom scrollbars ─────────────────────────────────────────── */
+  /* Chrome / Safari / Edge */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: hsl(240 5.9% 82% / 0.6);
+    border-radius: 3px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: hsl(265 89% 78% / 0.7);
+  }
+  ::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+  /* Dark mode */
+  .dark ::-webkit-scrollbar-thumb {
+    background: hsl(240 3.7% 28% / 0.7);
+  }
+  .dark ::-webkit-scrollbar-thumb:hover {
+    background: hsl(265 89% 70% / 0.8);
+  }
+  /* Firefox */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: hsl(240 5.9% 82% / 0.6) transparent;
+  }
+  .dark * {
+    scrollbar-color: hsl(240 3.7% 28% / 0.7) transparent;
+  }
+
+  /* Kanban board horizontal scrollbar — slightly more visible */
   .clarity-scrollbar::-webkit-scrollbar {
-    height: 10px;
-    width: 10px;
+    height: 6px;
+    width: 6px;
   }
   .clarity-scrollbar::-webkit-scrollbar-track {
     background: transparent;
   }
   .clarity-scrollbar::-webkit-scrollbar-thumb {
-    background: hsl(240 5.9% 80%);
-    border-radius: 5px;
+    background: hsl(265 89% 78% / 0.35);
+    border-radius: 3px;
+  }
+  .clarity-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: hsl(265 89% 78% / 0.65);
   }
   .dark .clarity-scrollbar::-webkit-scrollbar-thumb {
-    background: hsl(240 3.7% 25%);
+    background: hsl(265 89% 70% / 0.35);
+  }
+  .dark .clarity-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: hsl(265 89% 70% / 0.65);
   }
 
   /* Used by AI-generation overlay skeletons and freshly-arrived tickets. */

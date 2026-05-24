@@ -9,6 +9,7 @@ import { HomePage } from '@/features/home/home-page'
 import { MembersPage } from '@/features/members/members-page'
 import { ProjectDashboard } from '@/features/projects/project-dashboard'
 import { ProjectsPage } from '@/features/projects/projects-page'
+import { SimulationPage } from '@/features/simulation/simulation-page'
 import { AdminLayout } from '@/features/admin/AdminLayout'
 import { DashboardPage } from '@/features/admin/DashboardPage'
 import { UsersPage } from '@/features/admin/UsersPage'
@@ -27,6 +28,7 @@ export default function App() {
         <Route element={<ProtectedRoute />}>
           <Route element={<AppShell />}>
             <Route path="/projects" element={<ProjectsPage />} />
+            <Route path="/simulation" element={<SimulationPage />} />
             <Route path="/projects/:projectId" element={<ProjectDashboard />} />
             <Route path="/projects/:projectId/board" element={<BoardPage />} />
             <Route path="/projects/:projectId/members" element={<MembersPage />} />
