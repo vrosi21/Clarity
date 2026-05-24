@@ -43,6 +43,7 @@ class TicketResponse(BaseModel):
     complexity: int
     category_id: int | None
     category_name: str | None = None
+    category_color: str | None = None
     estimated_minutes: int | None
     assignee_id: int | None
     assignee_username: str | None = None

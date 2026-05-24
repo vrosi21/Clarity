@@ -86,4 +86,13 @@
   .dark .clarity-scrollbar::-webkit-scrollbar-thumb {
     background: hsl(240 3.7% 25%);
   }
+
+  /* Used by AI-generation overlay skeletons and freshly-arrived tickets. */
+  @keyframes clarity-fade-up {
+    from { opacity: 0; transform: translateY(8px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  .animate-fade-up {
+    animation: clarity-fade-up 360ms ease-out both;
+  }
 }

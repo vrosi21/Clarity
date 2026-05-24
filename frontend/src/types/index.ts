@@ -73,6 +73,7 @@ export interface Ticket {
   assignee_username: string | null
   category_id: number | null
   category_name: string | null
+  category_color: string | null
   created_at: string
   updated_at: string
 }
@@ -90,6 +91,7 @@ export interface Category {
   id: number
   name: string
   description: string | null
+  color: string
 }
 
 export interface UserDetail {

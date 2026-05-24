@@ -9,6 +9,7 @@ import { ticketsApi } from '@/api/tickets'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { BoardColumn } from '@/features/board/board-column'
+import { GenerationOverlay } from '@/features/board/generation-overlay'
 import { ProjectSettingsSheet } from '@/features/settings/ProjectSettingsSheet'
 import { CreateTicketDialog } from '@/features/board/create-ticket-dialog'
 import { TicketSheet } from '@/features/ticket/ticket-sheet'
@@ -87,7 +88,8 @@ export function BoardPage() {
       </div>
 
       {/* Board */}
-      <div className="clarity-scrollbar flex-1 overflow-x-auto overflow-y-hidden bg-muted/20">
+      <div className="clarity-scrollbar relative flex-1 overflow-x-auto overflow-y-hidden bg-muted/20">
+        <GenerationOverlay projectId={id} />
         {stagesError && (
           <div className="p-8 text-center text-sm text-muted-foreground">
             Couldn't load board. Refresh the page.

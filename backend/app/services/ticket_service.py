@@ -24,6 +24,7 @@ def _to_response(ticket: Ticket) -> TicketResponse:
         complexity=ticket.complexity,
         category_id=ticket.category_id,
         category_name=ticket.category.name if ticket.category else None,
+        category_color=ticket.category.color if ticket.category else None,
         estimated_minutes=ticket.estimated_minutes,
         assignee_id=ticket.assignee_id,
         assignee_username=ticket.assignee.username if ticket.assignee else None,

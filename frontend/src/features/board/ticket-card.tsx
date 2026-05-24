@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { ArrowRight, MoreHorizontal, Tag } from 'lucide-react'
+import { ArrowRight, MoreHorizontal } from 'lucide-react'
 import { toast } from 'sonner'
 
 import { ticketsApi } from '@/api/tickets'
@@ -111,8 +111,23 @@ export function TicketCard({ projectId, ticket, stages, onClick }: Props) {
           {PRIORITY_LABEL[ticket.priority]}
         </Badge>
         {ticket.category_name && (
-          <Badge variant="secondary" className="gap-1 text-xs">
-            <Tag className="h-3 w-3" />
+          <Badge
+            variant="outline"
+            className="gap-1 text-xs"
+            style={
+              ticket.category_color
+                ? {
+                    borderColor: ticket.category_color,
+                    color: ticket.category_color,
+                    backgroundColor: `${ticket.category_color}1a`,
+                  }
+                : undefined
+            }
+          >
+            <span
+              className="h-1.5 w-1.5 rounded-full"
+              style={{ backgroundColor: ticket.category_color ?? 'currentColor' }}
+            />
             {ticket.category_name}
           </Badge>
         )}

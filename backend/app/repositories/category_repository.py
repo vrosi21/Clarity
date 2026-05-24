@@ -17,8 +17,12 @@ class CategoryRepository:
     def get_by_name(self, name: str) -> Category | None:
         return self.db.execute(select(Category).where(Category.name == name)).scalar_one_or_none()
 
-    def create(self, name: str, description: str) -> Category:
-        category = Category(name=name.lower().strip(), description=description.strip())
+    def create(self, name: str, description: str, color: str | None = None) -> Category:
+        category = Category(
+            name=name.lower().strip(),
+            description=description.strip(),
+            color=color or "#64748b",
+        )
         self.db.add(category)
         self.db.commit()
         self.db.refresh(category)

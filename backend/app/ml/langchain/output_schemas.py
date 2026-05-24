@@ -45,6 +45,30 @@ class CategoryProficiency(BaseModel):
     )
 
 
+class CategoryDiffusionItem(BaseModel):
+    category_name: str = Field(description="Lowercase, slug-style canonical category name")
+    weight: float = Field(ge=0.0, le=1.0, description="Relative weight (0-1) of this category in the plan; weights need not sum to 1")
+    description: str = Field(description="One-sentence explanation of why this category is needed")
+
+
+class CategoryDiffusionOutput(BaseModel):
+    plan: list[CategoryDiffusionItem] = Field(default_factory=list)
+
+
+class GeneratedTaskItem(BaseModel):
+    title: str = Field(min_length=1, max_length=255)
+    description: str = Field(default="")
+    category_name: str
+    complexity: int = Field(ge=1, le=5)
+    estimated_minutes: int = Field(ge=15, le=4800)
+    priority: str = Field(description="One of: p1, p2, p3, p4, p5")
+    tag_names: list[str] = Field(default_factory=list)
+
+
+class GeneratedTasksOutput(BaseModel):
+    tasks: list[GeneratedTaskItem] = Field(default_factory=list)
+
+
 class SkillOutput(BaseModel):
     skills: list[str] = Field(
         default_factory=list, description="Extracted skill/technology names"

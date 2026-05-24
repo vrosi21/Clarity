@@ -32,3 +32,4 @@ class CategoryResponse(BaseModel):
     id: int
     name: str
     description: str | None
+    color: str

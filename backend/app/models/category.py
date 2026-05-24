@@ -18,6 +18,7 @@ class Category(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(String(64), unique=True, index=True, nullable=False)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    color: Mapped[str] = mapped_column(String(16), nullable=False, default="#64748b")
 
     tickets: Mapped[list[Ticket]] = relationship(back_populates="category")
     worker_skill_profiles: Mapped[list[WorkerSkillProfile]] = relationship(

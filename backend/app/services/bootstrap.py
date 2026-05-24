@@ -154,13 +154,29 @@ def ensure_default_tags(db: Session) -> list[Tag]:
     return created
 
 
+_CANONICAL_COLORS: dict[str, str] = {
+    "backend": "#3b82f6",
+    "frontend": "#a855f7",
+    "devops": "#f59e0b",
+    "design": "#ec4899",
+    "mobile": "#10b981",
+    "data": "#06b6d4",
+    "qa": "#eab308",
+    "security": "#ef4444",
+}
+
+
 def ensure_canonical_categories(db: Session) -> list[Category]:
-    existing_names = {c.name for c in db.query(Category).all()}
+    existing = {c.name: c for c in db.query(Category).all()}
     created: list[Category] = []
     for name in CANONICAL_CATEGORIES:
-        if name in existing_names:
+        color = _CANONICAL_COLORS.get(name, "#64748b")
+        if name in existing:
+            cat = existing[name]
+            if not cat.color or cat.color == "#64748b":
+                cat.color = color
             continue
-        cat = Category(name=name, description=f"Default {name} category")
+        cat = Category(name=name, description=f"Default {name} category", color=color)
         db.add(cat)
         created.append(cat)
     if created:
