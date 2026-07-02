@@ -200,7 +200,7 @@ export const PRIORITIES: Priority[] = ['p1', 'p2', 'p3', 'p4', 'p5']
 
 // ── Simulation ────────────────────────────────────────────────────────────────
 
-export type SimulationEventType = 'assigned' | 'stage_changed' | 'completed' | 'blocked'
+export type SimulationEventType = 'assigned' | 'stage_changed' | 'completed' | 'blocked' | 'rejected'
 
 export interface SimulationEvent {
   t: number
@@ -219,6 +219,7 @@ export interface SimulationSummaryStats {
   avg_efficiency: number
   n_tasks: number
   n_blocked: number
+  n_rejected: number
   n_workers: number
 }
 

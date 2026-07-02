@@ -43,8 +43,15 @@ class LogNormalNoise(BaseNoiseStrategy):
     section C scans it across {0.5, 1.0, 2.0}).
     """
 
-    def __init__(self, sigma_multiplier: float = 1.0) -> None:
+    def __init__(
+        self,
+        sigma_multiplier: float = 1.0,
+        max_multiplier: float | None = None,
+    ) -> None:
         self.sigma_multiplier = sigma_multiplier
+        # Hard cap on the lognormal draw so a single task never blows up to
+        # 10×–20× its estimate in a UI simulation. None = no cap (training mode).
+        self.max_multiplier = max_multiplier
 
     def sample(
         self,
@@ -53,4 +60,7 @@ class LogNormalNoise(BaseNoiseStrategy):
         rng: np.random.Generator,
     ) -> float:
         sigma = (0.08 + complexity * 0.04) * self.sigma_multiplier
-        return float(base_time * rng.lognormal(mean=0.0, sigma=sigma))
+        mult = float(rng.lognormal(mean=0.0, sigma=sigma))
+        if self.max_multiplier is not None:
+            mult = min(mult, self.max_multiplier)
+        return float(base_time * mult)

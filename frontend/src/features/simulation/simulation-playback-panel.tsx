@@ -21,6 +21,7 @@ const TYPE_BADGE: Record<string, string> = {
   stage_changed: 'bg-zinc-500/10 text-zinc-700 dark:text-zinc-300 border-zinc-500/30',
   completed: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/30',
   blocked: 'bg-red-500/15 text-red-700 dark:text-red-300 border-red-500/30',
+  rejected: 'bg-orange-500/15 text-orange-700 dark:text-orange-300 border-orange-500/30',
 }
 
 export function SimulationPlaybackPanel({ run, board, onReplay }: Props) {
@@ -48,6 +49,12 @@ export function SimulationPlaybackPanel({ run, board, onReplay }: Props) {
   const blockedNowCount = useMemo(
     () => Array.from(board.values()).filter((b) => b.stage === 'BLOCKED').length,
     [board],
+  )
+  // Rejection is transient (ticket bounces back to IN_PROGRESS), so count
+  // rejection events seen up to the cursor rather than current board state.
+  const rejectedSoFar = useMemo(
+    () => run.event_log.slice(0, cursorIndex).filter((e) => e.type === 'rejected').length,
+    [run, cursorIndex],
   )
   const workerLoad = useMemo(() => {
     const map = new Map<string, number>()
@@ -129,6 +136,7 @@ export function SimulationPlaybackPanel({ run, board, onReplay }: Props) {
         <div className="grid grid-cols-2 gap-2 text-xs">
           <Stat label="Completed" value={`${completedCount}/${board.size}`} />
           <Stat label="Blocked now" value={String(blockedNowCount)} />
+          <Stat label="Rejected" value={String(rejectedSoFar)} />
         </div>
         {workerLoad.length > 0 && (
           <div className="space-y-1 pt-2">
@@ -200,6 +208,8 @@ function describe(e: SimulationEvent): string {
       return `${e.worker_name} completed "${e.ticket_title}"`
     case 'blocked':
       return `"${e.ticket_title}" blocked while assigned to ${e.worker_name}`
+    case 'rejected':
+      return `"${e.ticket_title}" rejected from review — ${e.worker_name} reworks`
     case 'stage_changed':
       return `"${e.ticket_title}" moved ${e.from_stage} → ${e.to_stage}`
     default:
@@ -230,6 +240,7 @@ function SummaryFooter({ summary }: { summary: Record<string, number> }) {
         />
         <Stat label="Tasks" value={String(summary.n_tasks ?? 0)} />
         <Stat label="Blocked" value={String(summary.n_blocked ?? 0)} />
+        <Stat label="Rejected" value={String(summary.n_rejected ?? 0)} />
       </div>
     </div>
   )

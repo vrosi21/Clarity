@@ -254,7 +254,9 @@ class PolicySimulator(Simulator):
                 obs = history[(chosen.id, task.category)]
                 hist_eff = float(np.mean(obs)) if len(obs) >= 3 else math.nan
 
-                actual, was_blocked, proficiency = self._simulate_actual_minutes(chosen, task, rng)
+                # 4th return (was_rejected) is always False here: review
+                # rejection is opt-in and stays OFF for the training path.
+                actual, was_blocked, _was_rejected, proficiency = self._simulate_actual_minutes(chosen, task, rng)
                 eff_ratio = actual / max(task.estimated_minutes, 1)
                 task_completion_time = clock + actual
 

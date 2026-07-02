@@ -74,6 +74,7 @@ class Simulator:
         worker_generator: WorkerGenerator | None = None,
         task_generator: TaskGenerator | None = None,
         seed: int | None = None,
+        enable_review_rejection: bool = False,
     ) -> None:
         if noise_strategy is None:
             from app.ml.simulation.noise import LogNormalNoise
@@ -83,6 +84,9 @@ class Simulator:
         self.worker_gen = worker_generator or WorkerGenerator()
         self.task_gen = task_generator or TaskGenerator()
         self._default_seed = seed
+        # OFF by default so the training/dataset path is byte-identical (and
+        # consumes zero extra RNG). The UI simulation turns it on.
+        self.enable_review_rejection = enable_review_rejection
 
     # ------------------------------------------------------------------ public
 
@@ -241,11 +245,12 @@ class Simulator:
             still_stuck: list[SimTask] = []
             assigned_any = False
             for task in available:
-                # Capacity-eligible: available + within burnout.
+                # Capacity-eligible: available + within burnout + meets seniority requirement.
                 capacity_eligible = [
                     w for w in workers
                     if w.is_available
                     and w.current_load + task.estimated_minutes <= w.burnout_threshold
+                    and SENIORITY_RANK[w.seniority] >= task.requires_min_seniority
                 ]
                 if not capacity_eligible:
                     still_stuck.append(task)
@@ -268,7 +273,7 @@ class Simulator:
                 obs = history[(chosen.id, task.category)]
                 hist_eff = float(np.mean(obs)) if len(obs) >= 3 else math.nan
 
-                actual, was_blocked, proficiency = self._simulate_actual_minutes(chosen, task, rng)
+                actual, was_blocked, was_rejected, proficiency = self._simulate_actual_minutes(chosen, task, rng)
                 eff_ratio = actual / max(task.estimated_minutes, 1)
                 task_completion_time = clock + actual
 
@@ -296,9 +301,11 @@ class Simulator:
                         actual_minutes=actual,
                         efficiency_ratio=eff_ratio,
                         was_blocked=was_blocked,
+                        was_rejected=was_rejected,
                         sprint_id=sprint_id,
                         skill_match_score=proficiency,
                         arrival_time=task.arrival_time,
+                        assignment_time=clock,
                         completion_time=task_completion_time,
                     )
                 )
@@ -332,8 +339,8 @@ class Simulator:
         worker: SimWorker,
         task: SimTask,
         rng: np.random.Generator,
-    ) -> tuple[float, bool, float]:
-        """Return (actual_minutes, was_blocked, proficiency).
+    ) -> tuple[float, bool, bool, float]:
+        """Return (actual_minutes, was_blocked, was_rejected, proficiency).
 
         Skill is applied as a softened power-law instead of pure 1/proficiency
         so the multiplier stays in a sane range across the whole proficiency
@@ -389,7 +396,19 @@ class Simulator:
         if was_blocked:
             actual += float(rng.lognormal(mean=math.log(60.0), sigma=0.5))
 
-        return float(actual), was_blocked, proficiency
+        # Review rejection: a poor-fit assignment is more likely to bounce back
+        # from review. The same worker reworks part of the task — rework time is
+        # folded into actual_minutes here. Parallel signal to blocking.
+        # Guarded behind the flag so the training path consumes no extra RNG and
+        # its dataset stays unchanged (no retraining required).
+        was_rejected = False
+        if self.enable_review_rejection:
+            reject_prob = max(0.0, (task.complexity / 5.0) * (1.0 - proficiency) * 0.25)
+            was_rejected = bool(rng.random() < reject_prob)
+            if was_rejected:
+                actual += float(base_time * rng.uniform(0.2, 0.5))
+
+        return float(actual), was_blocked, was_rejected, proficiency
 
     @staticmethod
     def _build_row(
@@ -402,7 +421,9 @@ class Simulator:
         was_blocked: bool,
         sprint_id: int,
         skill_match_score: float,
+        was_rejected: bool = False,
         arrival_time: float = 0.0,
+        assignment_time: float = 0.0,
         completion_time: float = 0.0,
     ) -> dict[str, Any]:
         """Build one dataset row.
@@ -435,8 +456,10 @@ class Simulator:
             "task_id": task.id,
             "task_category": task.category,
             "was_blocked": was_blocked,
+            "was_rejected": was_rejected,
             "sprint_id": sprint_id,
             "arrival_time": arrival_time,
+            "assignment_time": assignment_time,
             "completion_time": completion_time,
         }
 

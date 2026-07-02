@@ -67,6 +67,14 @@ class SimulationService:
             if not tasks:
                 raise ValueError("No tickets found for simulation")
 
+            # Clamp seniority requirements to what the team can actually satisfy,
+            # so a high-complexity ticket never gets stuck unassignable in
+            # BACKLOG when the team has no senior/lead member.
+            max_team_rank = max(SENIORITY_RANK[w.seniority] for w in workers)
+            for t in tasks:
+                if t.requires_min_seniority > max_team_rank:
+                    t.requires_min_seniority = max_team_rank
+
             event_log = self._execute_simulation(
                 workers, tasks, worker_meta, task_meta,
                 temperature=float(snapshot.get("temperature", 0.3)),
@@ -211,12 +219,25 @@ class SimulationService:
     def _build_sim_tasks_from_project(
         self, project_id: int, db: Session
     ) -> tuple[list[SimTask], dict[int, dict]]:
-        """Convert Ticket rows into SimTask objects."""
+        """Convert Ticket rows into SimTask objects.
+
+        Tickets carry no `requires_min_seniority` column, so it is derived from
+        complexity. We sample from the same tuned complexity→seniority table the
+        synthetic TaskGenerator uses (`_REQ_SENIORITY_PROBS`) so identical-
+        complexity tickets get a spread of requirements instead of all
+        defaulting to junior — trivial tasks skew junior, complex tasks skew
+        senior/lead.
+        """
+        from app.ml.simulation.generator import _REQ_SENIORITY_PROBS
+
         tickets = db.execute(
             select(Ticket)
             .options(selectinload(Ticket.category))
             .where(Ticket.project_id == project_id)
         ).scalars().all()
+
+        rng = np.random.default_rng()
+        max_rank = max(SENIORITY_RANK.values())
 
         tasks: list[SimTask] = []
         meta: dict[int, dict] = {}
@@ -226,13 +247,18 @@ class SimulationService:
             priority = _PRIORITY_MAP.get(t.priority.value if hasattr(t.priority, "value") else str(t.priority), 3)
             estimated = t.estimated_minutes or 120
 
+            complexity = int(min(max(t.complexity or 3, 1), 5))
+            req_probs = _REQ_SENIORITY_PROBS[complexity]
+            requires_min_seniority = int(rng.choice(np.arange(0, 4), p=req_probs))
+            requires_min_seniority = min(requires_min_seniority, max_rank)
+
             sim_t = SimTask(
                 id=t.id,
                 category=category,
-                complexity=t.complexity,
+                complexity=complexity,
                 priority=priority,
                 estimated_minutes=estimated,
-                requires_min_seniority=0,
+                requires_min_seniority=requires_min_seniority,
             )
             tasks.append(sim_t)
             meta[t.id] = {"title": t.title}
@@ -250,14 +276,27 @@ class SimulationService:
         temperature: float = 0.3,
     ) -> list[dict[str, Any]]:
         # τ scales noise: low τ → tight, deterministic-ish outcomes; high τ → wide spread.
-        # Range 0.05–1.0 mapped to sigma_multiplier 0.4–2.5.
+        # Range 0.05–1.0 mapped to sigma_multiplier 0.4–1.6 (was 0.4–2.5 — that
+        # pushed the lognormal tail into 8–15× outliers, single tasks running
+        # for "days"). Cap each draw at 3.5× base so no single task dominates
+        # the timeline of a UI sim.
         from app.ml.simulation.noise import LogNormalNoise
-        sigma_mult = 0.4 + (temperature - 0.05) * (2.5 - 0.4) / (1.0 - 0.05)
-        sim = Simulator(noise_strategy=LogNormalNoise(sigma_multiplier=sigma_mult))
+        sigma_mult = 0.4 + (temperature - 0.05) * (1.6 - 0.4) / (1.0 - 0.05)
+        sim = Simulator(
+            noise_strategy=LogNormalNoise(
+                sigma_multiplier=sigma_mult, max_multiplier=3.5,
+            ),
+            enable_review_rejection=True,
+        )
         # Fresh seed per call so identical configs still produce variance.
         seed = int(np.random.SeedSequence().entropy % (2**31 - 1))
         rng = np.random.default_rng(seed)
-        sim._assign_arrival_times(tasks, rng)
+        # All tasks present at t=0 — UI simulation runs an existing backlog, not
+        # a live sprint where the PM trickles in late tickets. The simulator's
+        # default 70/30 split scatters 30% across 24h of sim-time, leaving
+        # workers idle while the board looks like "RL is doing nothing".
+        for t in tasks:
+            t.arrival_time = 0.0
         rows = sim._simulate(workers, tasks, rng, sprint_id=0)  # noqa: SLF001
 
         events: list[dict[str, Any]] = []
@@ -265,17 +304,22 @@ class SimulationService:
             task_id = int(row["task_id"])
             worker_id = int(row["worker_id"])
             t_arrive = float(row.get("arrival_time", 0.0))
+            t_assigned = float(row.get("assignment_time", t_arrive))
             t_complete = float(row.get("completion_time", 0.0))
             was_blocked = bool(row.get("was_blocked", False))
+            was_rejected = bool(row.get("was_rejected", False))
 
             w_name = worker_meta.get(worker_id, {}).get("name", f"Worker {worker_id}")
             t_title = task_meta.get(task_id, {}).get("title", f"Ticket {task_id}")
 
-            duration = max(t_complete - t_arrive, 1.0)
+            # Duration is measured from actual assignment time, not arrival.
+            # If a task arrived at t=0 but every worker was busy until t=300,
+            # the visualised "in flight" span starts at 300, not 0.
+            duration = max(t_complete - t_assigned, 1.0)
 
-            # BACKLOG → ASSIGNED
+            # BACKLOG → ASSIGNED (at the moment a worker actually picked it up)
             events.append({
-                "t": round(t_arrive, 2),
+                "t": round(t_assigned, 2),
                 "type": "assigned",
                 "ticket_id": task_id,
                 "ticket_title": t_title,
@@ -287,7 +331,7 @@ class SimulationService:
             })
 
             # ASSIGNED → IN_PROGRESS (worker picks it up shortly after)
-            t_start = round(t_arrive + duration * 0.05, 2)
+            t_start = round(t_assigned + duration * 0.05, 2)
             events.append({
                 "t": t_start,
                 "type": "stage_changed",
@@ -302,7 +346,7 @@ class SimulationService:
 
             if was_blocked:
                 # IN_PROGRESS → BLOCKED → IN_PROGRESS (mid-work interruption)
-                t_blocked = round(t_arrive + duration * 0.4, 2)
+                t_blocked = round(t_assigned + duration * 0.4, 2)
                 events.append({
                     "t": t_blocked,
                     "type": "blocked",
@@ -326,7 +370,34 @@ class SimulationService:
                     "q_value": None,
                 })
 
-            # IN_PROGRESS → IN_REVIEW (just before completion)
+            if was_rejected:
+                # IN_PROGRESS → IN_REVIEW (first submission)
+                t_review1 = round(t_complete - duration * 0.4, 2)
+                events.append({
+                    "t": t_review1,
+                    "type": "stage_changed",
+                    "ticket_id": task_id,
+                    "ticket_title": t_title,
+                    "worker_id": worker_id,
+                    "worker_name": w_name,
+                    "from_stage": "IN_PROGRESS",
+                    "to_stage": "IN_REVIEW",
+                    "q_value": None,
+                })
+                # IN_REVIEW → IN_PROGRESS (rejected — same worker reworks)
+                events.append({
+                    "t": round(t_complete - duration * 0.35, 2),
+                    "type": "rejected",
+                    "ticket_id": task_id,
+                    "ticket_title": t_title,
+                    "worker_id": worker_id,
+                    "worker_name": w_name,
+                    "from_stage": "IN_REVIEW",
+                    "to_stage": "IN_PROGRESS",
+                    "q_value": None,
+                })
+
+            # IN_PROGRESS → IN_REVIEW (final submission, just before completion)
             t_review = round(t_complete - max(duration * 0.05, 1.0), 2)
             events.append({
                 "t": t_review,
@@ -369,6 +440,9 @@ class SimulationService:
 
         task_map = {t.id: t for t in tasks}
         efficiency_ratios: list[float] = []
+        # ASSIGNED event time now reflects actual pickup (not arrival), so
+        # efficiency_ratio = actual_work_time / estimated_minutes, which is
+        # what the dataset definition calls for.
         assigned_events = {e["ticket_id"]: e for e in events if e["type"] == "assigned"}
         for e in completed:
             tid = e["ticket_id"]
@@ -380,12 +454,14 @@ class SimulationService:
 
         avg_eff = float(np.mean(efficiency_ratios)) if efficiency_ratios else 0.0
         n_blocked = sum(1 for e in events if e["type"] == "blocked")
+        n_rejected = sum(1 for e in events if e["type"] == "rejected")
 
         return {
             "total_time": round(total_time, 2),
             "avg_efficiency": round(avg_eff, 4),
             "n_tasks": len(tasks),
             "n_blocked": n_blocked,
+            "n_rejected": n_rejected,
             "n_workers": len(workers),
         }
 
