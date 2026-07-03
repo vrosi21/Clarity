@@ -54,11 +54,13 @@ def compute_reward(
     Higher is better:
         + priority component: P1 tasks completing efficiently matter most.
         + efficiency component: 1/eff_ratio rewarded (lower ratio = faster).
-        - overload penalty: assigning to a heavily loaded worker penalised.
+        - overload penalty: continuous penalty starting at 50% load, giving the
+          agent a smooth gradient to learn load-aware assignment rather than a
+          binary cliff at 80%.
     """
     efficiency_score = min(1.0 / max(row["efficiency_ratio"], 0.1), 2.0)
     priority_score = row["priority_numeric"] / 5.0
-    overload_penalty = float(row["load_ratio_at_assignment"] > 0.8)
+    overload_penalty = max(0.0, row["load_ratio_at_assignment"] - 0.5) * 2.0
     return (
         w_priority * priority_score
         + w_efficiency * efficiency_score

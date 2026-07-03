@@ -391,8 +391,10 @@ class Simulator:
         base_time = base * complexity_penalty * load_penalty * worker.base_productivity
         actual = self.noise.sample(base_time, task.complexity, rng)
 
-        block_prob = max(0.0, (task.complexity / 5.0) * (1.0 - proficiency) * 0.3)
-        was_blocked = bool(rng.random() < block_prob)
+        skill_block    = max(0.0, (task.complexity / 5.0) * (1.0 - proficiency) * 0.3)
+        overload_block = max(0.0, (load_ratio - 0.5) * 0.40)  # overloaded workers make more mistakes
+        block_prob     = min(0.75, skill_block + overload_block)
+        was_blocked    = bool(rng.random() < block_prob)
         if was_blocked:
             actual += float(rng.lognormal(mean=math.log(60.0), sigma=0.5))
 
